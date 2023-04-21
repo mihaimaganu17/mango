@@ -1,3 +1,4 @@
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -7,8 +8,11 @@ mod tests {
         let ls_path = "testdata/ls";
         let bytes = fs::read(ls_path).unwrap();
 
+        let entry_point = 0x6ab0;
         let exec_bytes = bytes.get(0x4000..0x13146).unwrap();
 
-        println!("{:?}", exec_bytes);
+        let first_20_bytes = bytes.get(entry_point..entry_point+20).unwrap();
+
+        println!("{:02x?}", first_20_bytes);
     }
 }
