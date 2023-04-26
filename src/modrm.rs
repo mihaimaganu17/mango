@@ -51,21 +51,6 @@ impl From<u8> for EffAddr16Bit {
                     0b010 => Self(Some(Reg::BP), Some(Reg::SI), Some(DispArch::Bit8)),
                     0b011 => Self(Some(Reg::BP), Some(Reg::DI), Some(DispArch::Bit8)),
                     0b100 => Self(Some(Reg::SI), None, Some(DispArch::Bit8)),
-                    0b100 => Self(Some(Reg::DI), None, Some(DispArch::Bit8)),
-                    0b100 => Self(Some(Reg::BP), None, Some(DispArch::Bit8)),
-                    0b100 => Self(Some(Reg::BX), None, Some(DispArch::Bit8)),
-                    // Since we know only the low 3 bits can have a value in R/M, this option is
-                    // only needed by the Rust compiler and something very wrong happened
-                    _ => unreachable!(),
-                }
-            }
-            0b01 => {
-                match r_m {
-                    0b000 => Self(Some(Reg::BX), Some(Reg::SI), Some(DispArch::Bit8)),
-                    0b001 => Self(Some(Reg::BX), Some(Reg::DI), Some(DispArch::Bit8)),
-                    0b010 => Self(Some(Reg::BP), Some(Reg::SI), Some(DispArch::Bit8)),
-                    0b011 => Self(Some(Reg::BP), Some(Reg::DI), Some(DispArch::Bit8)),
-                    0b100 => Self(Some(Reg::SI), None, Some(DispArch::Bit8)),
                     0b101 => Self(Some(Reg::DI), None, Some(DispArch::Bit8)),
                     0b110 => Self(Some(Reg::BP), None, Some(DispArch::Bit8)),
                     0b111 => Self(Some(Reg::BX), None, Some(DispArch::Bit8)),
@@ -124,26 +109,37 @@ impl From<u8> for EffAddr16Bit {
 
 /// Represents an Effective Address using 16-bit mode Addressing
 #[derive(Debug)]
-pub struct EffAddr32Bit(Option<Reg>, Option<Reg>, Option<DispArch>);
+pub struct EffAddr32Bit(EffAddrType, Option<DispArch>);
 
-impl From<u8> for EffAddr16Bit {
+#[derive(Debug)]
+pub enum EffAddrType {
+    // This means that the base of the effective address is backed by a register
+    Reg(Reg),
+    // This means that we have to use the SIB(Scale, Base, Index) that follows the ModR/M byte to
+    // get the effective address.
+    Sib,
+    // No need for a register or a SIB byte
+    None,
+}
+
+impl From<u8> for EffAddr32Bit {
     fn from(value: u8) -> Self{
         // Get R/M
         let r_m = value & 0b111;
         // Get Mod
         let mod_addr = value >> 6 & 0b11;
 
-        let eff_addr_16bit = match mod_addr {
+        let eff_addr_32bit = match mod_addr {
             0b00 => {
                 match r_m {
-                    0b000 => Self(Some(Reg::BX), Some(Reg::SI), None),
-                    0b001 => Self(Some(Reg::BX), Some(Reg::DI), None),
-                    0b010 => Self(Some(Reg::BP), Some(Reg::SI), None),
-                    0b011 => Self(Some(Reg::BP), Some(Reg::DI), None),
-                    0b100 => Self(Some(Reg::SI), None, None),
-                    0b101 => Self(Some(Reg::DI), None, None),
-                    0b110 => Self(None, None, Some(DispArch::Bit16)),
-                    0b111 => Self(Some(Reg::BX), None, None),
+                    0b000 => Self(EffAddrType::Reg(Reg::EAX), None),
+                    0b001 => Self(EffAddrType::Reg(Reg::ECX), None),
+                    0b010 => Self(EffAddrType::Reg(Reg::EDX), None),
+                    0b011 => Self(EffAddrType::Reg(Reg::EBX), None),
+                    0b100 => Self(EffAddrType::Sib, None),
+                    0b101 => Self(EffAddrType::None, Some(DispArch::Bit32)),
+                    0b110 => Self(EffAddrType::Reg(Reg::ESI), None),
+                    0b111 => Self(EffAddrType::Reg(Reg::EDI), None),
                     // Since we know only the low 3 bits can have a value in R/M, this option is
                     // only needed by the Rust compiler and something very wrong happened
                     _ => unreachable!(),
@@ -151,29 +147,14 @@ impl From<u8> for EffAddr16Bit {
             }
             0b01 => {
                 match r_m {
-                    0b000 => Self(Some(Reg::BX), Some(Reg::SI), Some(DispArch::Bit8)),
-                    0b001 => Self(Some(Reg::BX), Some(Reg::DI), Some(DispArch::Bit8)),
-                    0b010 => Self(Some(Reg::BP), Some(Reg::SI), Some(DispArch::Bit8)),
-                    0b011 => Self(Some(Reg::BP), Some(Reg::DI), Some(DispArch::Bit8)),
-                    0b100 => Self(Some(Reg::SI), None, Some(DispArch::Bit8)),
-                    0b100 => Self(Some(Reg::DI), None, Some(DispArch::Bit8)),
-                    0b100 => Self(Some(Reg::BP), None, Some(DispArch::Bit8)),
-                    0b100 => Self(Some(Reg::BX), None, Some(DispArch::Bit8)),
-                    // Since we know only the low 3 bits can have a value in R/M, this option is
-                    // only needed by the Rust compiler and something very wrong happened
-                    _ => unreachable!(),
-                }
-            }
-            0b01 => {
-                match r_m {
-                    0b000 => Self(Some(Reg::BX), Some(Reg::SI), Some(DispArch::Bit8)),
-                    0b001 => Self(Some(Reg::BX), Some(Reg::DI), Some(DispArch::Bit8)),
-                    0b010 => Self(Some(Reg::BP), Some(Reg::SI), Some(DispArch::Bit8)),
-                    0b011 => Self(Some(Reg::BP), Some(Reg::DI), Some(DispArch::Bit8)),
-                    0b100 => Self(Some(Reg::SI), None, Some(DispArch::Bit8)),
-                    0b101 => Self(Some(Reg::DI), None, Some(DispArch::Bit8)),
-                    0b110 => Self(Some(Reg::BP), None, Some(DispArch::Bit8)),
-                    0b111 => Self(Some(Reg::BX), None, Some(DispArch::Bit8)),
+                    0b000 => Self(EffAddrType::Reg(Reg::EAX), Some(DispArch::Bit8)),
+                    0b001 => Self(EffAddrType::Reg(Reg::ECX), Some(DispArch::Bit8)),
+                    0b010 => Self(EffAddrType::Reg(Reg::EDX), Some(DispArch::Bit8)),
+                    0b011 => Self(EffAddrType::Reg(Reg::EBX), Some(DispArch::Bit8)),
+                    0b100 => Self(EffAddrType::Sib, Some(DispArch::Bit8)),
+                    0b101 => Self(EffAddrType::Reg(Reg::EBP), Some(DispArch::Bit8)),
+                    0b110 => Self(EffAddrType::Reg(Reg::ESI), Some(DispArch::Bit8)),
+                    0b111 => Self(EffAddrType::Reg(Reg::EDI), Some(DispArch::Bit8)),
                     // Since we know only the low 3 bits can have a value in R/M, this option is
                     // only needed by the Rust compiler and something very wrong happened
                     _ => unreachable!(),
@@ -181,38 +162,38 @@ impl From<u8> for EffAddr16Bit {
             }
             0b10 => {
                 match r_m {
-                    0b000 => Self(Some(Reg::BX), Some(Reg::SI), Some(DispArch::Bit16)),
-                    0b001 => Self(Some(Reg::BX), Some(Reg::DI), Some(DispArch::Bit16)),
-                    0b010 => Self(Some(Reg::BP), Some(Reg::SI), Some(DispArch::Bit16)),
-                    0b011 => Self(Some(Reg::BP), Some(Reg::DI), Some(DispArch::Bit16)),
-                    0b100 => Self(Some(Reg::SI), None, Some(DispArch::Bit16)),
-                    0b101 => Self(Some(Reg::DI), None, Some(DispArch::Bit16)),
-                    0b110 => Self(Some(Reg::BP), None, Some(DispArch::Bit16)),
-                    0b111 => Self(Some(Reg::BX), None, Some(DispArch::Bit16)),
+                    0b000 => Self(EffAddrType::Reg(Reg::EAX), Some(DispArch::Bit32)),
+                    0b001 => Self(EffAddrType::Reg(Reg::ECX), Some(DispArch::Bit32)),
+                    0b010 => Self(EffAddrType::Reg(Reg::EDX), Some(DispArch::Bit32)),
+                    0b011 => Self(EffAddrType::Reg(Reg::EBX), Some(DispArch::Bit32)),
+                    0b100 => Self(EffAddrType::Sib, Some(DispArch::Bit32)),
+                    0b101 => Self(EffAddrType::Reg(Reg::EBP), Some(DispArch::Bit32)),
+                    0b110 => Self(EffAddrType::Reg(Reg::ESI), Some(DispArch::Bit32)),
+                    0b111 => Self(EffAddrType::Reg(Reg::EDI), Some(DispArch::Bit32)),
                     // Since we know only the low 3 bits can have a value in R/M, this option is
                     // only needed by the Rust compiler and something very wrong happened
-                    _ => Self(None, None, None),
+                    _ => unreachable!(),
                 }
             }
             0b11 => {
                 // The following registers are just placeholders for a set of registers
                 match r_m {
                     // EAX/AX/AL/MM0/XMM0
-                    0b000 => Self(Some(Reg::EAX), None, None),
+                    0b000 => Self(EffAddrType::Reg(Reg::EAX), None),
                     // ECX/CX/CL/MM1/XMM1
-                    0b000 => Self(Some(Reg::ECX), None, None),
+                    0b000 => Self(EffAddrType::Reg(Reg::ECX), None),
                     // EDX/DX/DL/MM2/XMM2
-                    0b000 => Self(Some(Reg::EDX), None, None),
+                    0b000 => Self(EffAddrType::Reg(Reg::EDX), None),
                     // EBX/BX/BL/MM3/XMM3
-                    0b000 => Self(Some(Reg::EBX), None, None),
+                    0b000 => Self(EffAddrType::Reg(Reg::EBX), None),
                     // ESP/SP/AHMM4/XMM4
-                    0b000 => Self(Some(Reg::ESP), None, None),
+                    0b000 => Self(EffAddrType::Reg(Reg::ESP), None),
                     // EBP/BP/CH/MM5/XMM5
-                    0b000 => Self(Some(Reg::EBP), None, None),
+                    0b000 => Self(EffAddrType::Reg(Reg::EBP), None),
                     // ESI/SI/DH/MM6/XMM6
-                    0b000 => Self(Some(Reg::ESI), None, None),
+                    0b000 => Self(EffAddrType::Reg(Reg::ESI), None),
                     // EDI/DI/BH/MM7/XMM7
-                    0b000 => Self(Some(Reg::EDI), None, None),
+                    0b000 => Self(EffAddrType::Reg(Reg::EDI), None),
                     // Since we know only the low 3 bits can have a value in R/M, this option is
                     // only needed by the Rust compiler and something very wrong happened
                     _ => unreachable!(),
@@ -223,7 +204,7 @@ impl From<u8> for EffAddr16Bit {
             _ => unreachable!(),
         };
 
-        eff_addr_16bit
+        eff_addr_32bit
     }
 }
 
@@ -240,3 +221,8 @@ pub struct Addressing16Bit {
 /// Certain encodings of the ModR/M byte require a second addressing byte (the SIB byte). The
 /// base-plus-index and scale-plus-index forms of 32-bit addressing require the SIB byte.
 pub struct SIB(u8);
+
+impl From<u8> for SIB {
+    fn from(value: u8) -> Self {
+    }
+}
