@@ -20,3 +20,4 @@ pub struct Opcode;
 mod opcode_prefix {
     pub const TWO_BYTE_ESCAPE_CODE: u8 = 0x0F;
 }
+
