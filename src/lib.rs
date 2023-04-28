@@ -4,6 +4,7 @@ mod opcode;
 mod modrm;
 mod imm;
 mod reg;
+mod reader;
 
 #[cfg(test)]
 mod tests {
