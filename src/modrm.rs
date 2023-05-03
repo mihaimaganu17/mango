@@ -11,7 +11,6 @@ use crate::reg::Reg;
 /// The `mod` field combines with the r/m field to form 32 possible values: eight registers and 24
 /// addressing modes.
 /// The `reg/opcode` field specifies either a register number or three more bits of opcode
-// TODO: We need to parse addresses based on 16-bit and 32-bit addressing forms.
 /// information. The purpose of the `reg/opcode` field is specified in the primary opcode.
 /// The `r/m` field can specify a register as an operand or it can be combined with the mod field
 /// to encode an addressing mode

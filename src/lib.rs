@@ -6,7 +6,6 @@ mod reg;
 mod reader;
 mod dis;
 
-
 #[cfg(test)]
 mod tests {
     use std::fs;
