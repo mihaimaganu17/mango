@@ -2,6 +2,7 @@
 
 /// Represents instruction prefixes of 1 byte each. They are divided into four groups, each
 /// with a set of allowable prefix codes.
+#[derive(Debug, Clone, Copy)]
 pub enum Prefix {
     // Lock, repeat and BND prefixes
     Group1(Group1),
@@ -11,6 +12,36 @@ pub enum Prefix {
     OpSize,
     // Address-size override, allows a program to switch between 16-bit and 32-bit addressing
     AddrSize,
+    // There is no prefix, which is valid for a x86_64 ISA
+    None,
+}
+
+impl Prefix {
+    /// Takes one bytes, specified by `value` and tries to see if it is a prefix
+    pub fn from_byte(value: u8) -> Self {
+        // We are basically testing, iteratively, the `value` against all prefix types
+        // The order of the tested prefix types below is not important and does not matter.
+
+        // We first try and see, if we have a Group1 prefix
+        if let Ok(temp_prefix) = Group1::try_from(value) {
+            return Self::Group1(temp_prefix)
+        }
+
+        // Second, if we have a Group2 prefix
+        if let Ok(temp_prefix) = Group2::try_from(value) {
+            return Self::Group2(temp_prefix)
+        }
+
+        // Next, we check for overrides
+        match value {
+            // Operand size override
+            prefix_code::OP_SIZE_OVERRIDE => Self::OpSize,
+            // Address size override
+            prefix_code::ADDR_SIZE_OVERRIDE => Self::AddrSize,
+            // Any other value, does not represent a prefix
+            _ => Self::None,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -18,7 +49,7 @@ pub enum PrefixError {
     InvalidPrefix,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Group1 {
     // Forces an operation that ensures exclusive use of shared memory in a multiprocessor
     // environment.
@@ -47,7 +78,7 @@ impl TryFrom<u8> for Group1 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Group2 {
     // CS Segment override(used with any branch instruction) or
     // Branch not taken(on older microarchitectures, used only with Jcc instructions)
