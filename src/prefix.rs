@@ -4,7 +4,7 @@
 /// with a set of allowable prefix codes.
 pub enum Prefix {
     // Lock, repeat and BND prefixes
-    Group1(Group1), 
+    Group1(Group1),
     // Segment Override prefixes
     Group2(Group2),
     // Operand-size override, allows a program to switch between 16-bit and 32-bit operand sizes.
@@ -36,9 +36,12 @@ impl TryFrom<u8> for Group1 {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            prefix_code::LOCK => Ok(Self::Lock), 
-            prefix_code::REPNE => Ok(Self::RepNE), 
-            prefix_code::REP => Ok(Self::Rep), 
+            prefix_code::LOCK => Ok(Self::Lock),
+            prefix_code::REPNE => Ok(Self::RepNE),
+            prefix_code::REP => Ok(Self::Rep),
+            prefix_code::LOCK => Ok(Self::Lock),
+            prefix_code::REPNE => Ok(Self::RepNE),
+            prefix_code::REP => Ok(Self::Rep),
             _ => Err(PrefixError::InvalidPrefix),
         }
     }

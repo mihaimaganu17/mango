@@ -9,6 +9,16 @@
 /// byte if one is present). If a displacement is required, it can be 1, 2, or 4 bytes.
 pub struct Displacement;
 
+#[derive(Debug)]
+pub enum DispArch {
+    // Denotes an 8-bit displacement that follows the ModR/M byte and that is sign-extended and
+    // added to the index.
+    Bit8,
+    // Denotes a 16-bit displacement that follows the ModR/M byte and that is added to the index.
+    Bit16,
+    Bit32,
+}
+
 /// If an instruction specifies an immediate operand, the operand always follows any displacement
 /// bytes. An immediate operand can be 1, 2 or 4 bytes
 pub struct Immediate;
