@@ -26,14 +26,8 @@ impl From<OpcodeError> for DisassemblerError {
 
 impl Disassembler {
     pub fn parse(&self, reader: &mut Reader) -> Result<(), DisassemblerError> {
-        while reader.pos() < 10 {
-            let byte = reader.read::<u8>()?;
-
-            let prefix = Prefix::from_byte(byte);
-
-            println!("Prefix: {:?}", prefix);
-
-            let opcode = OpcodeIdent::from_prefix_reader(prefix, reader)?;
+        while reader.pos() < 20 {
+            let opcode = OpcodeIdent::from_reader(reader)?;
 
             println!("Opcode: {:?}", opcode);
         }

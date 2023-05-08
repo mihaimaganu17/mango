@@ -2,6 +2,9 @@
 use crate::{
     prefix::{Prefix, Group1},
     reader::{Reader, ReaderError},
+    reg::Reg,
+    imm::Immediate,
+    modrm::ModRM,
 };
 
 /// Represents a primary opcode in an x86_64 Architecture. The primary opcode can be 1, 2 or even
@@ -25,7 +28,14 @@ pub enum OpcodeIdent {
     EndBr32,
     // Terminate an indirect branch in 64 bit mode.
     EndBr64,
+    Xor(Operand, Operand),
     Unknown,
+}
+
+#[derive(Debug)]
+pub enum Operand {
+    Reg,
+    Immediate,
 }
 
 #[derive(Debug)]
@@ -44,13 +54,24 @@ impl From<ReaderError> for OpcodeError {
 impl OpcodeIdent {
     /// Parse the next `Opcode` from the `reader`, given the prefix. We need to pass the `reader`
     /// to this function, since we do not know if the opcode is 1, 2 or 3 bytes
-    pub fn from_prefix_reader(prefix: Prefix, reader: &mut Reader) -> Result<Self, OpcodeError> {
-        // We read one bytes from the reader, to check if it is the escape code byte
+    pub fn from_reader(reader: &mut Reader) -> Result<Self, OpcodeError> {
+        // Read one byte
         let byte = reader.read::<u8>()?;
+
+        // Try to parse a prefix from it
+        let prefix = Prefix::from_byte(byte);
+
+        // Next, we read the first opcode of the instruction
+        let first_byte = match prefix {
+            // If there is no prefix, the first byte is actually the one we just read
+            Prefix::None => byte,
+            // If there is a prefix, we read another byte
+            _ => reader.read::<u8>()?,
+        };
 
         // We keep a check that we can easily reference forwards. This match may be merged into the
         // match below
-        let is_escape_code = match byte {
+        let is_escape_code = match first_byte {
             opcode_prefix::ESCAPE_CODE => true,
             _ => false,
         };
@@ -72,7 +93,7 @@ impl OpcodeIdent {
                                             0xFB => Ok(OpcodeIdent::EndBr32),
                                             0xFA => Ok(OpcodeIdent::EndBr64),
                                             _ => Err(OpcodeError::Invalid3ByteOpcode(
-                                                    byte,
+                                                    first_byte,
                                                     second_byte,
                                                     third_byte,
                                                 )),
@@ -90,11 +111,21 @@ impl OpcodeIdent {
                     _ => Err(OpcodeError::InvalidPrefix(prefix)),
                 }
             }
-            false => Ok(OpcodeIdent::Unknown),
+            false => match first_byte {
+                // XOR opcodes
+                0x31 => {
+                    let mod_rm_byte = reader.read::<u8>()?;
+                    let mod_rm = ModRM::from_opcode_reg(mod_rm_byte, None);
+                    println!("{:x?}", mod_rm);
+                    Ok(OpcodeIdent::Xor(Operand::Immediate, Operand::Immediate))
+                }
+                _ => Ok(OpcodeIdent::Unknown),
+            }
         }
     }
 }
 
 mod opcode_prefix {
     pub const ESCAPE_CODE: u8 = 0x0F;
+
 }

@@ -14,7 +14,49 @@ use crate::reg::Reg;
 /// information. The purpose of the `reg/opcode` field is specified in the primary opcode.
 /// The `r/m` field can specify a register as an operand or it can be combined with the mod field
 /// to encode an addressing mode
-pub struct ModRM(u8);
+#[derive(Debug)]
+pub struct ModRM(Reg, Addressing);
+
+impl ModRM {
+    pub fn from_opcode_reg(value: u8, maybe_arch: Option<Arch>) -> Self {
+        // We compute the addressing form, based on what we are passed
+        let addressing = match maybe_arch {
+            // If we have an architecture passed, we parse addressing based on that
+            Some(arch) => {
+                match arch {
+                    Arch::Arch16 => Addressing::EffAddr16Bit(EffAddr16Bit::from(value)),
+                    Arch::Arch32 => Addressing::EffAddr32Bit(EffAddr32Bit::from(value)),
+                    Arch::Arch64 => Addressing::EffAddr64Bit,
+                }
+            }
+            // If not, the default is 32 Bits
+            None => Addressing::EffAddr32Bit(EffAddr32Bit::from(value)),
+        };
+
+        let reg = (value >> 3) & 0b111;
+
+        let reg = match addressing {
+            Addressing::EffAddr16Bit(_) => Reg::from_rm16(reg),
+            _ => Reg::from_rm32(reg),
+        };
+
+        Self(reg, addressing)
+    }
+}
+
+#[derive(Debug)]
+pub enum Addressing {
+    EffAddr16Bit(EffAddr16Bit),
+    EffAddr32Bit(EffAddr32Bit),
+    EffAddr64Bit,
+}
+
+#[derive(Debug)]
+pub enum Arch {
+    Arch16,
+    Arch32,
+    Arch64,
+}
 
 /// Represents an Effective Address using 16-bit mode Addressing
 #[derive(Debug)]
@@ -205,11 +247,6 @@ impl From<u8> for EffAddr32Bit {
 
         eff_addr_32bit
     }
-}
-
-pub struct Addressing16Bit {
-    mod_rm: ModRM,
-    eff_addr: EffAddr16Bit,
 }
 
 /// Made up of also 3 parts:

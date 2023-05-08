@@ -54,7 +54,7 @@ mod tests {
         let ls_path = "testdata/ls";
         let bytes = fs::read(ls_path).unwrap();
 
-        let exec_bytes = bytes.get(0x4000..0x13146).unwrap();
+        let exec_bytes = bytes.get(0x6ab0..0x13146).unwrap();
 
         let mut reader = Reader::from_vec(exec_bytes.to_vec());
         let dis = Disassembler;
