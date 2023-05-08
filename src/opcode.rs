@@ -5,6 +5,7 @@ use crate::{
     reg::Reg,
     imm::Immediate,
     modrm::ModRM,
+    rex::Rex,
 };
 
 /// Represents a primary opcode in an x86_64 Architecture. The primary opcode can be 1, 2 or even
@@ -61,12 +62,26 @@ impl OpcodeIdent {
         // Try to parse a prefix from it
         let prefix = Prefix::from_byte(byte);
 
-        // Next, we read the first opcode of the instruction
-        let first_byte = match prefix {
+        // Next, we check if we actually read a prefix, or not and we update the next byte we 
+        // have to parse, accordingly
+        let maybe_rex_byte = match prefix {
             // If there is no prefix, the first byte is actually the one we just read
             Prefix::None => byte,
             // If there is a prefix, we read another byte
             _ => reader.read::<u8>()?,
+        };
+
+        // Check if our the byte we read above is actually a `Rex` prefix
+        let maybe_rex = Rex::from_byte(maybe_rex_byte);
+
+        // Now based, on the fact that we got a REX prefix, we either
+        // a. Read another byte
+        // b. Use the last byte we read as the current byte
+        let first_byte = match maybe_rex {
+            // If we actually got a REX prefix, we just fetch the next byte
+            Some(rex) => reader.read::<u8>()?,
+            // If not, the current byte is actually the next opcode
+            None => maybe_rex_byte,
         };
 
         // We keep a check that we can easily reference forwards. This match may be merged into the

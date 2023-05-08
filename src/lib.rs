@@ -5,6 +5,7 @@ mod imm;
 mod reg;
 mod reader;
 mod dis;
+mod rex;
 
 #[cfg(test)]
 mod tests {
