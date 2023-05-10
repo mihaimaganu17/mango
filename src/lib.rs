@@ -6,6 +6,7 @@ mod reg;
 mod reader;
 mod dis;
 mod rex;
+mod inst;
 
 #[cfg(test)]
 mod tests {

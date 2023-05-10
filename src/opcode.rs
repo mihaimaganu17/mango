@@ -55,44 +55,31 @@ impl From<ReaderError> for OpcodeError {
 impl OpcodeIdent {
     /// Parse the next `Opcode` from the `reader`, given the prefix. We need to pass the `reader`
     /// to this function, since we do not know if the opcode is 1, 2 or 3 bytes
-    pub fn from_reader(reader: &mut Reader) -> Result<Self, OpcodeError> {
-        // Read one byte
-        let byte = reader.read::<u8>()?;
+    pub fn from_byte(byte: u8) -> Result<Self, OpcodeError> {
+        match first_byte {
+            // XOR opcodes
+            0x31 => {
+                let mod_rm_byte = reader.read::<u8>()?;
+                let mod_rm = ModRM::from_opcode_reg(mod_rm_byte, None);
+                println!("{:x?}", mod_rm);
+                Ok(OpcodeIdent::Xor(Operand::Immediate, Operand::Immediate))
+            }
+            _ => Ok(OpcodeIdent::Unknown),
+        }
+    }
 
-        // Try to parse a prefix from it
-        let prefix = Prefix::from_byte(byte);
+    /// Special function that returns results based on the read prefix. This typically implies
+    /// that the Opcode will be 2 or 3-bytes long.
+    /// This function does not handle REX prefixes. It is the job of the caller to do that.
+    /// In the event of matching a REX prefix, this function will return an error.
+    pub fn with_prefix(reader: &mut Reader, prefix: Prefix) -> Result<(), OpcodeError> {
+        // Read the first byte from the `reader`
+        let first_byte = reader::read::<u8>()?;
 
-        // Next, we check if we actually read a prefix, or not and we update the next byte we 
-        // have to parse, accordingly
-        let maybe_rex_byte = match prefix {
-            // If there is no prefix, the first byte is actually the one we just read
-            Prefix::None => byte,
-            // If there is a prefix, we read another byte
-            _ => reader.read::<u8>()?,
-        };
-
-        // Check if our the byte we read above is actually a `Rex` prefix
-        let maybe_rex = Rex::from_byte(maybe_rex_byte);
-
-        // Now based, on the fact that we got a REX prefix, we either
-        // a. Read another byte
-        // b. Use the last byte we read as the current byte
-        let first_byte = match maybe_rex {
-            // If we actually got a REX prefix, we just fetch the next byte
-            Some(rex) => reader.read::<u8>()?,
-            // If not, the current byte is actually the next opcode
-            None => maybe_rex_byte,
-        };
-
-        // We keep a check that we can easily reference forwards. This match may be merged into the
-        // match below
-        let is_escape_code = match first_byte {
-            opcode_prefix::ESCAPE_CODE => true,
-            _ => false,
-        };
-
-        match is_escape_code {
-            true => {
+        // Check where the first byte we read is an escaped code or not.
+        match first_byte {
+            // If we found an escape code, than we know that the Opcode is 2 or 3 bytes long
+            opcode_prefix::ESCAPE_CODE => {
                 match prefix {
                     Prefix::Group1(gr1) => {
                         match gr1 {
@@ -126,16 +113,9 @@ impl OpcodeIdent {
                     _ => Err(OpcodeError::InvalidPrefix(prefix)),
                 }
             }
-            false => match first_byte {
-                // XOR opcodes
-                0x31 => {
-                    let mod_rm_byte = reader.read::<u8>()?;
-                    let mod_rm = ModRM::from_opcode_reg(mod_rm_byte, None);
-                    println!("{:x?}", mod_rm);
-                    Ok(OpcodeIdent::Xor(Operand::Immediate, Operand::Immediate))
-                }
-                _ => Ok(OpcodeIdent::Unknown),
-            }
+            // If the byte is not an escape code, that means it is just a 1-byte
+            // opcode, that we have to parse.
+            _ => Self::from_reader(reader),
         }
     }
 }
