@@ -12,34 +12,32 @@ pub enum Prefix {
     OpSize,
     // Address-size override, allows a program to switch between 16-bit and 32-bit addressing
     AddrSize,
-    // There is no prefix, which is valid for a x86_64 ISA
-    None,
 }
 
 impl Prefix {
     /// Takes one bytes, specified by `value` and tries to see if it is a prefix
-    pub fn from_byte(value: u8) -> Self {
+    pub fn from_byte(value: u8) -> Option<Self> {
         // We are basically testing, iteratively, the `value` against all prefix types
         // The order of the tested prefix types below is not important and does not matter.
 
         // We first try and see, if we have a Group1 prefix
         if let Ok(temp_prefix) = Group1::try_from(value) {
-            return Self::Group1(temp_prefix)
+            return Some(Self::Group1(temp_prefix))
         }
 
         // Second, if we have a Group2 prefix
         if let Ok(temp_prefix) = Group2::try_from(value) {
-            return Self::Group2(temp_prefix)
+            return Some(Self::Group2(temp_prefix))
         }
 
         // Next, we check for overrides
         match value {
             // Operand size override
-            prefix_code::OP_SIZE_OVERRIDE => Self::OpSize,
+            prefix_code::OP_SIZE_OVERRIDE => Some(Self::OpSize),
             // Address size override
-            prefix_code::ADDR_SIZE_OVERRIDE => Self::AddrSize,
+            prefix_code::ADDR_SIZE_OVERRIDE => Some(Self::AddrSize),
             // Any other value, does not represent a prefix
-            _ => Self::None,
+            _ => None,
         }
     }
 }

@@ -1,7 +1,8 @@
 //! Module that acts as the core disassembler of the program
 use crate::reader::{Reader, ReaderError};
 use crate::prefix::Prefix;
-use crate::opcode::{OpcodeIdent, OpcodeError};
+use crate::opcode::OpcodeError;
+use crate::inst::{Instruction, InstructionError};
 
 #[derive(Debug)]
 pub struct Disassembler;
@@ -10,6 +11,7 @@ pub struct Disassembler;
 pub enum DisassemblerError {
     ReaderError(ReaderError),
     OpcodeError(OpcodeError),
+    InstructionError(InstructionError),
 }
 
 impl From<ReaderError> for DisassemblerError {
@@ -24,12 +26,18 @@ impl From<OpcodeError> for DisassemblerError {
     }
 }
 
+impl From<InstructionError> for DisassemblerError {
+    fn from(value: InstructionError) -> Self {
+        Self::InstructionError(value)
+    }
+}
+
 impl Disassembler {
     pub fn parse(&self, reader: &mut Reader) -> Result<(), DisassemblerError> {
         while reader.pos() < 20 {
-            let opcode = OpcodeIdent::from_reader(reader)?;
+            let instruction = Instruction::from_reader(reader)?;
 
-            println!("Opcode: {:?}", opcode);
+            println!("Instruction: {:?}", instruction);
         }
 
         // First we try and read the prefix

@@ -1,50 +1,84 @@
+use crate::{
+    opcode::{Opcode, OpcodeError},
+    prefix::Prefix,
+    rex::Rex,
+    reader::Reader,
+};
+
+#[derive(Debug)]
 pub struct Instruction {
     // Optional prefix that can alter the instruction behaviour or can be specified to give a
     // different instruction.
-    prefix: Prefix,
-    // Optiona REX prefix, used to specify that the instruction needs and can be used in 64-bit
+    prefix: Option<Prefix>,
+    // Optional REX prefix, used to specify that the instruction needs and can be used in 64-bit
     // mode
-    rex: Rex,
+    rex: Option<Rex>,
     // 1, 2, or 3-byte sequence that identifies the instruction type
     opcode: Opcode,
     // A list of, maximum 4 operands, or a minumum of 0 operands that are used by the instruction.
-    operands: [Option<Operand>; 4],
+    //operands: [Option<Operand>; 4],
     // The encoding, describes the type of operands, their sizes, location and how they are used in
     // the instruction
-    encoding: Encoding,
+    //encoding: Encoding,
     // The addressing mode, used by the processor
-    mode: Mode,
+    //mode: Mode,
 }
 
 impl Instruction {
     pub fn from_reader(reader: &mut Reader) -> Result<Self, InstructionError> {
-        // Read one byte
-        let byte = reader.read::<u8>()?;
+        // We assume that there is no prefix
+        let mut maybe_prefix = None;
+        // We also assume that there is not REX prefix
+        let mut maybe_rex = None;
 
-        // Try to parse a prefix from it
-        let prefix = Prefix::from_byte(byte);
+        // Try and parse the byte as an Opcode
+        let first_opcode = Opcode::from_reader(reader)?;
 
-        // Next, we check if we actually read a prefix, or not and we update the next byte we 
-        // have to parse, accordingly
-        let maybe_rex_byte = match prefix {
-            // If there is no prefix, the first byte is actually the one we just read
-            Prefix::None => byte,
-            // If there is a prefix, we read another byte
-            _ => reader.read::<u8>()?,
+        // Based on wheather we have a prefix or not, we read the second opcode.
+        let second_opcode = match first_opcode {
+            // If we got a prefix, try and parse the next bytes, taking into acount that we have a
+            // prefix
+            Opcode::Prefix(op_prefix) => {
+                maybe_prefix = Some(op_prefix);
+                Opcode::with_prefix(reader, op_prefix)?
+            }
+            _ => first_opcode
         };
 
-        // Check if our the byte we read above is actually a `Rex` prefix
-        let maybe_rex = Rex::from_byte(maybe_rex_byte);
-
-        // Now based, on the fact that we got a REX prefix, we either
-        // a. Read another byte
-        // b. Use the last byte we read as the current byte
-        let first_byte = match maybe_rex {
-            // If we actually got a REX prefix, we just fetch the next byte
-            Some(rex) => reader.read::<u8>()?,
-            // If not, the current byte is actually the next opcode
-            None => maybe_rex_byte,
+        // At this point we know that the second opcode cannot be a normal prefix.
+        // However, it can be a REX prefix, so we also want to check for that
+        let third_opcode = match second_opcode {
+            // If we got a rex prefix, we read again the next opcode
+            Opcode::Rex(op_rex) => {
+                // Initialize our own REX
+                maybe_rex = Some(op_rex);
+                 
+                // At this point we need to take into acount if we do have a prefix or not. This is
+                // because the prefix can change the opcode and the instruction
+                match maybe_prefix {
+                    Some(prefix) => Opcode::with_prefix(reader, prefix)?, 
+                    None => Opcode::from_reader(reader)?,
+                }
+            }
+            _ => second_opcode,
         };
+        
+        Ok(Instruction {
+            prefix: maybe_prefix,
+            rex: maybe_rex,
+            opcode: third_opcode,
+        })
+    }
+}
 
+/// Issues errors for instruction parsing
+#[derive(Debug)]
+pub enum InstructionError {
+    OpcodeError(OpcodeError),
+}
+
+impl From<OpcodeError> for InstructionError {
+    fn from(err: OpcodeError) -> Self {
+        InstructionError::OpcodeError(err)
     }
 }

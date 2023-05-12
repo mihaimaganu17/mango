@@ -24,12 +24,20 @@ use crate::{
 /// Three-bytes opcode formats are just like above, but instead of 1 bytes following the escape
 /// code, there are 2 bytes
 #[derive(Debug)]
-pub enum OpcodeIdent {
+pub enum Opcode {
+    // A prefix byte for special operations or extending the instruction encoding
+    Prefix(Prefix),
+    // A REX prefix used to configure 64-bit mode operations
+    Rex(Rex),
+    // A bitwise XOR between 2 operands
+    Xor(Operand, Operand),
+    // The opcode alone is not enough and it needs an Extension from a ModRM field
+    NeedsModRMExtension,
     // Terminate an indirect branch in 32 bit and compatibility mode.
     EndBr32,
     // Terminate an indirect branch in 64 bit mode.
     EndBr64,
-    Xor(Operand, Operand),
+    // Specifies and unknown opcode
     Unknown,
 }
 
@@ -52,29 +60,53 @@ impl From<ReaderError> for OpcodeError {
     }
 }
 
-impl OpcodeIdent {
+impl Opcode {
+    /// Reads one byte from the passed reader and parses it
+    pub fn from_reader(reader: &mut Reader) -> Result<Self, OpcodeError> {
+        // Read the first byte from the `reader`
+        let byte = reader.read::<u8>()?;
+
+        Self::from_byte(byte)
+    }
+
     /// Parse the next `Opcode` from the `reader`, given the prefix. We need to pass the `reader`
     /// to this function, since we do not know if the opcode is 1, 2 or 3 bytes
     pub fn from_byte(byte: u8) -> Result<Self, OpcodeError> {
-        match first_byte {
+        // We first try and parse the byte for a prefix
+        let maybe_prefix = Prefix::from_byte(byte);
+
+        // If we do get a prefix, we return and it is the caller job, to do something with it
+        if let Some(prefix) = maybe_prefix {
+            return Ok(Self::Prefix(prefix));
+        }
+
+        // If it is not a prefix, we still need to check for a REX prefix
+        let maybe_rex = Rex::from_byte(byte);
+
+        // If we do get a REX prefix, we return and it is the caller's job to call opcode parsing
+        // again for the next byte
+        if let Some(rex) = maybe_rex {
+            return Ok(Self::Rex(rex));
+        }
+
+        // This(soon to be gigantic match) will check the byte for the appropriate instruction.
+        // It is the job of this match to make sure we propagate the information upwards, that the
+        // calling function needs, in order to parse the rest of the bytes
+        match byte {
             // XOR opcodes
             0x31 => {
-                let mod_rm_byte = reader.read::<u8>()?;
-                let mod_rm = ModRM::from_opcode_reg(mod_rm_byte, None);
-                println!("{:x?}", mod_rm);
-                Ok(OpcodeIdent::Xor(Operand::Immediate, Operand::Immediate))
+                Ok(Opcode::Xor(Operand::Immediate, Operand::Immediate))
             }
-            _ => Ok(OpcodeIdent::Unknown),
+            _ => Ok(Opcode::Unknown),
         }
     }
 
-    /// Special function that returns results based on the read prefix. This typically implies
-    /// that the Opcode will be 2 or 3-bytes long.
+    /// Special function that returns results based on the read prefix. This typically, and
+    /// practically implies that the Opcode will be 2 or 3-bytes long.
     /// This function does not handle REX prefixes. It is the job of the caller to do that.
-    /// In the event of matching a REX prefix, this function will return an error.
-    pub fn with_prefix(reader: &mut Reader, prefix: Prefix) -> Result<(), OpcodeError> {
+    pub fn with_prefix(reader: &mut Reader, prefix: Prefix) -> Result<Self, OpcodeError> {
         // Read the first byte from the `reader`
-        let first_byte = reader::read::<u8>()?;
+        let first_byte = reader.read::<u8>()?;
 
         // Check where the first byte we read is an escaped code or not.
         match first_byte {
@@ -83,7 +115,7 @@ impl OpcodeIdent {
                 match prefix {
                     Prefix::Group1(gr1) => {
                         match gr1 {
-                            Group1::RepNE => Ok(OpcodeIdent::Unknown),
+                            Group1::RepNE => Ok(Opcode::Unknown),
                             Group1::Rep => {
                                 let second_byte = reader.read::<u8>()?;
                                 match second_byte {
@@ -92,8 +124,8 @@ impl OpcodeIdent {
                                         // We have to read a 3rd byte
                                         let third_byte = reader.read::<u8>()?;
                                         match third_byte {
-                                            0xFB => Ok(OpcodeIdent::EndBr32),
-                                            0xFA => Ok(OpcodeIdent::EndBr64),
+                                            0xFB => Ok(Opcode::EndBr32),
+                                            0xFA => Ok(Opcode::EndBr64),
                                             _ => Err(OpcodeError::Invalid3ByteOpcode(
                                                     first_byte,
                                                     second_byte,
@@ -101,13 +133,13 @@ impl OpcodeIdent {
                                                 )),
                                         }
                                     }
-                                    _ => Ok(OpcodeIdent::Unknown),
+                                    _ => Ok(Opcode::Unknown),
                                 }
                             }
                             _ => Err(OpcodeError::InvalidPrefix(prefix)),
                         }
                     }
-                    Prefix::OpSize => Ok(OpcodeIdent::Unknown),
+                    Prefix::OpSize => Ok(Opcode::Unknown),
                     // If we have an escape code, any other prefix is invalid for a 2-byte, 3-byte
                     // opcode
                     _ => Err(OpcodeError::InvalidPrefix(prefix)),
@@ -115,7 +147,7 @@ impl OpcodeIdent {
             }
             // If the byte is not an escape code, that means it is just a 1-byte
             // opcode, that we have to parse.
-            _ => Self::from_reader(reader),
+            _ => Self::from_byte(first_byte),
         }
     }
 }
