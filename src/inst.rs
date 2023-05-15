@@ -1,8 +1,9 @@
 use crate::{
-    opcode::{Opcode, OpcodeError},
+    opcode::{Operand, Opcode, OpcodeType, OpcodeError},
     prefix::Prefix,
     rex::Rex,
-    reader::Reader,
+    reader::{Reader, ReaderError},
+    modrm::{Arch, ModRM},
 };
 
 #[derive(Debug)]
@@ -16,16 +17,19 @@ pub struct Instruction {
     // 1, 2, or 3-byte sequence that identifies the instruction type
     opcode: Opcode,
     // A list of, maximum 4 operands, or a minumum of 0 operands that are used by the instruction.
-    //operands: [Option<Operand>; 4],
+    // operands: [Option<Operand>; 4],
     // The encoding, describes the type of operands, their sizes, location and how they are used in
     // the instruction
     //encoding: Encoding,
     // The addressing mode, used by the processor
-    //mode: Mode,
+    modrm: Option<ModRM>,
 }
 
 impl Instruction {
-    pub fn from_reader(reader: &mut Reader) -> Result<Self, InstructionError> {
+    pub fn from_reader(
+        reader: &mut Reader,
+        maybe_arch: Option<Arch>,
+    ) -> Result<Self, InstructionError> {
         // We assume that there is no prefix
         let mut maybe_prefix = None;
         // We also assume that there is not REX prefix
@@ -35,10 +39,10 @@ impl Instruction {
         let first_opcode = Opcode::from_reader(reader)?;
 
         // Based on wheather we have a prefix or not, we read the second opcode.
-        let second_opcode = match first_opcode {
+        let second_opcode = match first_opcode.ident {
             // If we got a prefix, try and parse the next bytes, taking into acount that we have a
             // prefix
-            Opcode::Prefix(op_prefix) => {
+            OpcodeType::Prefix(op_prefix) => {
                 maybe_prefix = Some(op_prefix);
                 Opcode::with_prefix(reader, op_prefix)?
             }
@@ -47,9 +51,9 @@ impl Instruction {
 
         // At this point we know that the second opcode cannot be a normal prefix.
         // However, it can be a REX prefix, so we also want to check for that
-        let third_opcode = match second_opcode {
+        let third_opcode = match second_opcode.ident {
             // If we got a rex prefix, we read again the next opcode
-            Opcode::Rex(op_rex) => {
+            OpcodeType::Rex(op_rex) => {
                 // Initialize our own REX
                 maybe_rex = Some(op_rex);
                  
@@ -62,11 +66,24 @@ impl Instruction {
             }
             _ => second_opcode,
         };
+
+        let modrm = match third_opcode.operands.contains(&Some(Operand::ModRM)) {
+            true => {
+                // We read the modrm byte
+                let modrm_byte = reader.read::<u8>()?;
+
+                // We parse it
+                Some(ModRM::from_byte_with_arch(modrm_byte, maybe_arch, maybe_rex))
+            }
+            false => None,
+        };
+
         
         Ok(Instruction {
             prefix: maybe_prefix,
             rex: maybe_rex,
             opcode: third_opcode,
+            modrm: modrm,
         })
     }
 }
@@ -75,10 +92,17 @@ impl Instruction {
 #[derive(Debug)]
 pub enum InstructionError {
     OpcodeError(OpcodeError),
+    ReaderError(ReaderError),
 }
 
 impl From<OpcodeError> for InstructionError {
     fn from(err: OpcodeError) -> Self {
         InstructionError::OpcodeError(err)
+    }
+}
+
+impl From<ReaderError> for InstructionError {
+    fn from(err: ReaderError) -> Self {
+        InstructionError::ReaderError(err)
     }
 }

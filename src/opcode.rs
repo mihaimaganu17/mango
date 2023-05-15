@@ -2,9 +2,6 @@
 use crate::{
     prefix::{Prefix, Group1},
     reader::{Reader, ReaderError},
-    reg::Reg,
-    imm::Immediate,
-    modrm::ModRM,
     rex::Rex,
 };
 
@@ -24,13 +21,13 @@ use crate::{
 /// Three-bytes opcode formats are just like above, but instead of 1 bytes following the escape
 /// code, there are 2 bytes
 #[derive(Debug)]
-pub enum Opcode {
+pub enum OpcodeType {
     // A prefix byte for special operations or extending the instruction encoding
     Prefix(Prefix),
     // A REX prefix used to configure 64-bit mode operations
     Rex(Rex),
     // A bitwise XOR between 2 operands
-    Xor(Operand, Operand),
+    Xor,
     // The opcode alone is not enough and it needs an Extension from a ModRM field
     NeedsModRMExtension,
     // Terminate an indirect branch in 32 bit and compatibility mode.
@@ -42,8 +39,18 @@ pub enum Opcode {
 }
 
 #[derive(Debug)]
+pub struct Opcode {
+    pub ident: OpcodeType,
+    pub operands: [Option<Operand>; 4],
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub enum Operand {
-    Reg,
+    // The ModRM needs to be read to get the operands,
+    ModRM,
+    // The operand is embedded in the opcode
+    Opcode,
+    // There is an Immediate integer following the opcode that represents the operand
     Immediate,
 }
 
@@ -77,7 +84,10 @@ impl Opcode {
 
         // If we do get a prefix, we return and it is the caller job, to do something with it
         if let Some(prefix) = maybe_prefix {
-            return Ok(Self::Prefix(prefix));
+            return Ok(Opcode {
+                ident: OpcodeType::Prefix(prefix),
+                operands: [None, None, None, None],
+            });
         }
 
         // If it is not a prefix, we still need to check for a REX prefix
@@ -86,7 +96,10 @@ impl Opcode {
         // If we do get a REX prefix, we return and it is the caller's job to call opcode parsing
         // again for the next byte
         if let Some(rex) = maybe_rex {
-            return Ok(Self::Rex(rex));
+            return Ok(Opcode {
+                ident: OpcodeType::Rex(rex),
+                operands: [None, None, None, None],
+            });
         }
 
         // This(soon to be gigantic match) will check the byte for the appropriate instruction.
@@ -94,10 +107,14 @@ impl Opcode {
         // calling function needs, in order to parse the rest of the bytes
         match byte {
             // XOR opcodes
-            0x31 => {
-                Ok(Opcode::Xor(Operand::Immediate, Operand::Immediate))
-            }
-            _ => Ok(Opcode::Unknown),
+            0x31 => Ok(Opcode {
+                ident: OpcodeType::Xor,
+                operands: [Some(Operand::ModRM), Some(Operand::ModRM), None, None],
+            }),
+            _ => Ok(Opcode {
+                ident: OpcodeType::Unknown,
+                operands: [None, None, None, None],
+            }),
         }
     }
 
@@ -115,7 +132,10 @@ impl Opcode {
                 match prefix {
                     Prefix::Group1(gr1) => {
                         match gr1 {
-                            Group1::RepNE => Ok(Opcode::Unknown),
+                            Group1::RepNE => Ok(Opcode {
+                                ident: OpcodeType::Unknown,
+                                operands: [None, None, None, None],
+                            }),
                             Group1::Rep => {
                                 let second_byte = reader.read::<u8>()?;
                                 match second_byte {
@@ -124,8 +144,14 @@ impl Opcode {
                                         // We have to read a 3rd byte
                                         let third_byte = reader.read::<u8>()?;
                                         match third_byte {
-                                            0xFB => Ok(Opcode::EndBr32),
-                                            0xFA => Ok(Opcode::EndBr64),
+                                            0xFB => Ok(Opcode {
+                                                ident: OpcodeType::EndBr32,
+                                                operands: [None, None, None, None]
+                                            }),
+                                            0xFA => Ok(Opcode {
+                                                ident: OpcodeType::EndBr64,
+                                                operands: [None, None, None, None]
+                                            }),
                                             _ => Err(OpcodeError::Invalid3ByteOpcode(
                                                     first_byte,
                                                     second_byte,
@@ -133,13 +159,19 @@ impl Opcode {
                                                 )),
                                         }
                                     }
-                                    _ => Ok(Opcode::Unknown),
+                                    _ => Ok(Opcode {
+                                        ident: OpcodeType::Unknown,
+                                        operands: [None, None, None, None],
+                                    }),
                                 }
                             }
                             _ => Err(OpcodeError::InvalidPrefix(prefix)),
                         }
                     }
-                    Prefix::OpSize => Ok(Opcode::Unknown),
+                    Prefix::OpSize => Ok(Opcode {
+                        ident: OpcodeType::Unknown,
+                        operands: [None, None, None, None],
+                    }),
                     // If we have an escape code, any other prefix is invalid for a 2-byte, 3-byte
                     // opcode
                     _ => Err(OpcodeError::InvalidPrefix(prefix)),

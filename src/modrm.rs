@@ -2,6 +2,7 @@
 
 use crate::imm::DispArch;
 use crate::reg::Reg;
+use crate::rex::Rex;
 
 /// Made up of three parts:
 /// - R/M, bits[0:3]
@@ -18,7 +19,7 @@ use crate::reg::Reg;
 pub struct ModRM(Reg, Addressing);
 
 impl ModRM {
-    pub fn from_opcode_reg(value: u8, maybe_arch: Option<Arch>) -> Self {
+    pub fn from_byte_with_arch(value: u8, maybe_arch: Option<Arch>, maybe_rex: Option<Rex>) -> Self {
         // We compute the addressing form, based on what we are passed
         let addressing = match maybe_arch {
             // If we have an architecture passed, we parse addressing based on that
@@ -26,21 +27,32 @@ impl ModRM {
                 match arch {
                     Arch::Arch16 => Addressing::EffAddr16Bit(EffAddr16Bit::from(value)),
                     Arch::Arch32 => Addressing::EffAddr32Bit(EffAddr32Bit::from(value)),
-                    Arch::Arch64 => Addressing::EffAddr64Bit,
+                    Arch::Arch64 => Addressing::EffAddr64Bit(EffAddr64Bit::from_byte_with_rex(value, maybe_rex)),
                 }
             }
             // If not, the default is 32 Bits
             None => Addressing::EffAddr32Bit(EffAddr32Bit::from(value)),
         };
 
+        // TODO: Handle Register-Register operation
+        // Get Mod
+        let mod_addr = value >> 6 & 0b11;
+
         let reg = (value >> 3) & 0b111;
 
-        let reg = match addressing {
-            Addressing::EffAddr16Bit(_) => Reg::from_rm16(reg),
-            _ => Reg::from_rm32(reg),
+        // If the mod we are using is just register to register addressing, with no memory operand,
+        // we need to prefix the `reg` field as well.
+        let reg = match mod_addr {
+            0b11 => {
+                match maybe_rex {
+                    Some(rex) => (rex.r() << 3) | reg,
+                    None => reg,
+                }
+            }
+            _ => reg
         };
 
-        Self(reg, addressing)
+        Self(Reg::from_byte_with_arch(reg, maybe_arch), addressing)
     }
 }
 
@@ -48,10 +60,10 @@ impl ModRM {
 pub enum Addressing {
     EffAddr16Bit(EffAddr16Bit),
     EffAddr32Bit(EffAddr32Bit),
-    EffAddr64Bit,
+    EffAddr64Bit(EffAddr64Bit),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Arch {
     Arch16,
     Arch32,
@@ -249,6 +261,140 @@ impl From<u8> for EffAddr32Bit {
     }
 }
 
+#[derive(Debug)]
+pub struct EffAddr64Bit(EffAddrType, Option<DispArch>);
+
+impl EffAddr64Bit {
+    fn from_byte_with_rex(value: u8, maybe_rex: Option<Rex>) -> Self{
+        // Get R/M
+        let mut r_m = value & 0b111;
+        // Since we may be using a REX, we have to extend the r/m byte to the desired register
+        if let Some(rex) = maybe_rex {
+            r_m = (rex.b() << 3) | r_m;
+        }
+
+        // Get Mod
+        let mod_addr = value >> 6 & 0b11;
+
+        let eff_addr_64bit = match mod_addr {
+            0b00 => {
+                match r_m {
+                    0b0000 => Self(EffAddrType::Reg(Reg::RAX), None),
+                    0b0001 => Self(EffAddrType::Reg(Reg::RCX), None),
+                    0b0010 => Self(EffAddrType::Reg(Reg::RDX), None),
+                    0b0011 => Self(EffAddrType::Reg(Reg::RBX), None),
+                    0b0100 => Self(EffAddrType::Sib, None),
+                    0b0101 => Self(EffAddrType::None, Some(DispArch::Bit32)),
+                    0b0110 => Self(EffAddrType::Reg(Reg::RSI), None),
+                    0b0111 => Self(EffAddrType::Reg(Reg::RDI), None),
+                    0b1000 => Self(EffAddrType::Reg(Reg::R8), None),
+                    0b1001 => Self(EffAddrType::Reg(Reg::R9), None),
+                    0b1010 => Self(EffAddrType::Reg(Reg::R10), None),
+                    0b1011 => Self(EffAddrType::Reg(Reg::R11), None),
+                    0b1100 => Self(EffAddrType::Reg(Reg::R12), None),
+                    0b1101 => Self(EffAddrType::Reg(Reg::R13), Some(DispArch::Bit32)),
+                    0b1110 => Self(EffAddrType::Reg(Reg::R14), None),
+                    0b1111 => Self(EffAddrType::Reg(Reg::R15), None),
+                    // Since we know only the low 3 bits can have a value in R/M, this option is
+                    // only needed by the Rust compiler and something very wrong happened
+                    _ => unreachable!(),
+                }
+            }
+            0b01 => {
+                match r_m {
+                    0b0000 => Self(EffAddrType::Reg(Reg::RAX), Some(DispArch::Bit8)),
+                    0b0001 => Self(EffAddrType::Reg(Reg::RCX), Some(DispArch::Bit8)),
+                    0b0010 => Self(EffAddrType::Reg(Reg::RDX), Some(DispArch::Bit8)),
+                    0b0011 => Self(EffAddrType::Reg(Reg::RBX), Some(DispArch::Bit8)),
+                    0b0100 => Self(EffAddrType::Sib, Some(DispArch::Bit8)),
+                    0b0101 => Self(EffAddrType::Reg(Reg::RBP), Some(DispArch::Bit8)),
+                    0b0110 => Self(EffAddrType::Reg(Reg::RSI), Some(DispArch::Bit8)),
+                    0b0111 => Self(EffAddrType::Reg(Reg::RDI), Some(DispArch::Bit8)),
+                    0b1000 => Self(EffAddrType::Reg(Reg::R8), Some(DispArch::Bit8)),
+                    0b1001 => Self(EffAddrType::Reg(Reg::R9), Some(DispArch::Bit8)),
+                    0b1010 => Self(EffAddrType::Reg(Reg::R10), Some(DispArch::Bit8)),
+                    0b1011 => Self(EffAddrType::Reg(Reg::R11), Some(DispArch::Bit8)),
+                    0b1100 => Self(EffAddrType::Reg(Reg::R12), Some(DispArch::Bit8)),
+                    0b1101 => Self(EffAddrType::Reg(Reg::R13), Some(DispArch::Bit8)),
+                    0b1110 => Self(EffAddrType::Reg(Reg::R14), Some(DispArch::Bit8)),
+                    0b1111 => Self(EffAddrType::Reg(Reg::R15), Some(DispArch::Bit8)),
+                    // Since we know only the low 3 bits can have a value in R/M, this option is
+                    // only needed by the Rust compiler and something very wrong happened
+                    _ => unreachable!(),
+                }
+            }
+            0b10 => {
+                match r_m {
+                    0b0000 => Self(EffAddrType::Reg(Reg::RAX), Some(DispArch::Bit32)),
+                    0b0001 => Self(EffAddrType::Reg(Reg::RCX), Some(DispArch::Bit32)),
+                    0b0010 => Self(EffAddrType::Reg(Reg::RDX), Some(DispArch::Bit32)),
+                    0b0011 => Self(EffAddrType::Reg(Reg::RBX), Some(DispArch::Bit32)),
+                    0b0100 => Self(EffAddrType::Sib, Some(DispArch::Bit32)),
+                    0b0101 => Self(EffAddrType::Reg(Reg::RBP), Some(DispArch::Bit32)),
+                    0b0110 => Self(EffAddrType::Reg(Reg::RSI), Some(DispArch::Bit32)),
+                    0b0111 => Self(EffAddrType::Reg(Reg::RDI), Some(DispArch::Bit32)),
+                    0b1000 => Self(EffAddrType::Reg(Reg::R8), Some(DispArch::Bit32)),
+                    0b1001 => Self(EffAddrType::Reg(Reg::R9), Some(DispArch::Bit32)),
+                    0b1010 => Self(EffAddrType::Reg(Reg::R10), Some(DispArch::Bit32)),
+                    0b1011 => Self(EffAddrType::Reg(Reg::R11), Some(DispArch::Bit32)),
+                    0b1100 => Self(EffAddrType::Reg(Reg::R12), Some(DispArch::Bit32)),
+                    0b1101 => Self(EffAddrType::Reg(Reg::R13), Some(DispArch::Bit32)),
+                    0b1110 => Self(EffAddrType::Reg(Reg::R14), Some(DispArch::Bit32)),
+                    0b1111 => Self(EffAddrType::Reg(Reg::R15), Some(DispArch::Bit32)),
+                    // Since we know only the low 3 bits can have a value in R/M, this option is
+                    // only needed by the Rust compiler and something very wrong happened
+                    _ => unreachable!(),
+                }
+            }
+            0b11 => {
+                // The following registers are just placeholders for a set of registers
+                match r_m {
+                    // EAX/AX/AL/MM0/XMM0
+                    0b0000 => Self(EffAddrType::Reg(Reg::RAX), None),
+                    // ECX/CX/CL/MM1/XMM1
+                    0b0001 => Self(EffAddrType::Reg(Reg::RCX), None),
+                    // EDX/DX/DL/MM2/XMM2
+                    0b0010 => Self(EffAddrType::Reg(Reg::RDX), None),
+                    // EBX/BX/BL/MM3/XMM3
+                    0b0011 => Self(EffAddrType::Reg(Reg::RBX), None),
+                    // ESP/SP/AHMM4/XMM4
+                    0b0100 => Self(EffAddrType::Reg(Reg::RSP), None),
+                    // EBP/BP/CH/MM5/XMM5
+                    0b0101 => Self(EffAddrType::Reg(Reg::RBP), None),
+                    // ESI/SI/DH/MM6/XMM6
+                    0b0110 => Self(EffAddrType::Reg(Reg::RSI), None),
+                    // EDI/DI/BH/MM7/XMM7
+                    0b0111 => Self(EffAddrType::Reg(Reg::RDI), None),
+                    // EAX/AX/AL/MM0/XMM0
+                    0b1000 => Self(EffAddrType::Reg(Reg::R8), None),
+                    // ECX/CX/CL/MM1/XMM1
+                    0b1001 => Self(EffAddrType::Reg(Reg::R9), None),
+                    // EDX/DX/DL/MM2/XMM2
+                    0b1010 => Self(EffAddrType::Reg(Reg::R10), None),
+                    // EBX/BX/BL/MM3/XMM3
+                    0b1011 => Self(EffAddrType::Reg(Reg::R11), None),
+                    // ESP/SP/AHMM4/XMM4
+                    0b1100 => Self(EffAddrType::Reg(Reg::R12), None),
+                    // EBP/BP/CH/MM5/XMM5
+                    0b1101 => Self(EffAddrType::Reg(Reg::R13), None),
+                    // ESI/SI/DH/MM6/XMM6
+                    0b1110 => Self(EffAddrType::Reg(Reg::R14), None),
+                    // EDI/DI/BH/MM7/XMM7
+                    0b1111 => Self(EffAddrType::Reg(Reg::R15), None),
+                    // Since we know only the low 3 bits can have a value in R/M, this option is
+                    // only needed by the Rust compiler and something very wrong happened
+                    _ => unreachable!(),
+                }
+            }
+            // Since we know only the low 2 bits can have a value for Mod, this option should never
+            // be accessed.
+            _ => unreachable!(),
+        };
+
+        eff_addr_64bit
+    }
+}
+
 /// Made up of also 3 parts:
 /// - Base, bits[0:3], specifies the register number of the base register.
 /// - Index, bits[3:6], specifies the register number of the index register.
@@ -316,5 +462,132 @@ impl From<u8> for ScaledIndex {
         };
 
         scaled_index
+    }
+}
+
+/// Represents a 64-bit scaled index
+pub struct Sib64 {
+    base: Option<Reg>,
+    scaled_index: Option<Reg>,
+    scale: Option<Scale>
+}
+
+impl Sib64 {
+    fn from_byte_with_rex(value: u8, maybe_rex: Option<Rex>) -> Self {
+        let scale = (value >> 6) & 0b11;
+
+        let mut idx = (value >> 3) & 0b111;
+        let mut base = value & 0b111;
+
+        if let Some(rex) = maybe_rex {
+            idx = (rex.x() << 3) | idx;
+            base = (rex.b() << 3) | base;
+        }
+
+        let base = match base {
+            0b0000 => Some(Reg::RAX),
+            0b0001 => Some(Reg::RCX),
+            0b0010 => Some(Reg::RDX),
+            0b0011 => Some(Reg::RBX),
+            0b0100 => Some(Reg::RSP),
+            0b0101 => Some(Reg::RBP),
+            0b0110 => Some(Reg::RSI),
+            0b0111 => Some(Reg::RDI),
+            0b1000 => Some(Reg::R8),
+            0b1001 => Some(Reg::R9),
+            0b1010 => Some(Reg::R10),
+            0b1011 => Some(Reg::R11),
+            0b1100 => Some(Reg::R12),
+            0b1101 => Some(Reg::R13),
+            0b1110 => Some(Reg::R14),
+            0b1111 => Some(Reg::R15),
+            _ => unreachable!(),
+        };
+
+        let scaled_index = match scale {
+            0b00 => match idx {
+                0b0000 => (Some(Reg::RAX), None),
+                0b0001 => (Some(Reg::RCX), None),
+                0b0010 => (Some(Reg::RDX), None),
+                0b0011 => (Some(Reg::RBX), None),
+                0b0100 => (None, None),
+                0b0101 => (Some(Reg::RBP), None),
+                0b0110 => (Some(Reg::RSI), None),
+                0b0111 => (Some(Reg::RDI), None),
+                0b1000 => (Some(Reg::R8), None),
+                0b1001 => (Some(Reg::R9), None),
+                0b1010 => (Some(Reg::R10), None),
+                0b1011 => (Some(Reg::R11), None),
+                0b1100 => (Some(Reg::R12), None),
+                0b1101 => (Some(Reg::R13), None),
+                0b1110 => (Some(Reg::R14), None),
+                0b1111 => (Some(Reg::R15), None),
+                _ => unreachable!(),
+            }
+            0b01 => match idx {
+                0b0000 => (Some(Reg::RAX), Some(Scale(2))),
+                0b0001 => (Some(Reg::RCX), Some(Scale(2))),
+                0b0010 => (Some(Reg::RDX), Some(Scale(2))),
+                0b0011 => (Some(Reg::RBX), Some(Scale(2))),
+                0b0100 => (None, None),
+                0b0101 => (Some(Reg::RBP), Some(Scale(2))),
+                0b0110 => (Some(Reg::RSI), Some(Scale(2))),
+                0b0111 => (Some(Reg::RDI), Some(Scale(2))),
+                0b1000 => (Some(Reg::R8), Some(Scale(2))),
+                0b1001 => (Some(Reg::R9), Some(Scale(2))),
+                0b1010 => (Some(Reg::R10), Some(Scale(2))),
+                0b1011 => (Some(Reg::R11), Some(Scale(2))),
+                0b1100 => (Some(Reg::R12), None),
+                0b1101 => (Some(Reg::R13), Some(Scale(2))),
+                0b1110 => (Some(Reg::R14), Some(Scale(2))),
+                0b1111 => (Some(Reg::R15), Some(Scale(2))),
+                _ => unreachable!(),
+            }
+            0b10 => match idx {
+                0b0000 => (Some(Reg::RAX), Some(Scale(4))),
+                0b0001 => (Some(Reg::RCX), Some(Scale(4))),
+                0b0010 => (Some(Reg::RDX), Some(Scale(4))),
+                0b0011 => (Some(Reg::RBX), Some(Scale(4))),
+                0b0100 => (None, None),
+                0b0101 => (Some(Reg::RBP), Some(Scale(4))),
+                0b0110 => (Some(Reg::RSI), Some(Scale(4))),
+                0b0111 => (Some(Reg::RDI), Some(Scale(4))),
+                0b1000 => (Some(Reg::R8), Some(Scale(4))),
+                0b1001 => (Some(Reg::R9), Some(Scale(4))),
+                0b1010 => (Some(Reg::R10), Some(Scale(4))),
+                0b1011 => (Some(Reg::R11), Some(Scale(4))),
+                0b1100 => (Some(Reg::R12), None),
+                0b1101 => (Some(Reg::R13), Some(Scale(4))),
+                0b1110 => (Some(Reg::R14), Some(Scale(4))),
+                0b1111 => (Some(Reg::R15), Some(Scale(4))),
+                _ => unreachable!(),
+            }
+            0b11 => match idx {
+                0b0000 => (Some(Reg::RAX), Some(Scale(8))),
+                0b0001 => (Some(Reg::RCX), Some(Scale(8))),
+                0b0010 => (Some(Reg::RDX), Some(Scale(8))),
+                0b0011 => (Some(Reg::RBX), Some(Scale(8))),
+                0b0100 => (None, None),
+                0b0101 => (Some(Reg::RBP), Some(Scale(8))),
+                0b0110 => (Some(Reg::RSI), Some(Scale(8))),
+                0b0111 => (Some(Reg::RDI), Some(Scale(8))),
+                0b1000 => (Some(Reg::R8), Some(Scale(8))),
+                0b1001 => (Some(Reg::R9), Some(Scale(8))),
+                0b1010 => (Some(Reg::R10), Some(Scale(8))),
+                0b1011 => (Some(Reg::R11), Some(Scale(8))),
+                0b1100 => (Some(Reg::R12), None),
+                0b1101 => (Some(Reg::R13), Some(Scale(8))),
+                0b1110 => (Some(Reg::R14), Some(Scale(8))),
+                0b1111 => (Some(Reg::R15), Some(Scale(8))),
+                _ => unreachable!(),
+            }
+            _ => unreachable!(),
+        };
+
+        Self {
+            base,
+            scaled_index: scaled_index.0,
+            scale: scaled_index.1,
+        }
     }
 }

@@ -58,4 +58,20 @@ impl Rex {
             _ => None,
         }
     }
+
+    pub fn b(&self) -> u8 {
+        self.b
+    }
+
+    pub fn x(&self) -> u8 {
+        self.x
+    }
+
+    pub fn r(&self) -> u8 {
+        self.r
+    }
+
+    pub fn w(&self) -> u8 {
+        self.w
+    }
 }

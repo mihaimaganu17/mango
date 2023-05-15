@@ -68,9 +68,6 @@ impl TryFrom<u8> for Group1 {
             prefix_code::LOCK => Ok(Self::Lock),
             prefix_code::REPNE => Ok(Self::RepNE),
             prefix_code::REP => Ok(Self::Rep),
-            prefix_code::LOCK => Ok(Self::Lock),
-            prefix_code::REPNE => Ok(Self::RepNE),
-            prefix_code::REP => Ok(Self::Rep),
             _ => Err(PrefixError::InvalidPrefix),
         }
     }
