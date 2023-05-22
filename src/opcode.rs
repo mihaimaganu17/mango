@@ -46,8 +46,10 @@ pub struct Opcode {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Operand {
-    // The ModRM needs to be read to get the operands,
+    // Represents a register or a memory operand found in the R/M field of ModR/M
     ModRM,
+    // Represents a register from the `reg` part of the ModRM field
+    ModReg,
     // The operand is embedded in the opcode
     Opcode,
     // There is an Immediate integer following the opcode that represents the operand
@@ -109,7 +111,7 @@ impl Opcode {
             // XOR opcodes
             0x31 => Ok(Opcode {
                 ident: OpcodeType::Xor,
-                operands: [Some(Operand::ModRM), Some(Operand::ModRM), None, None],
+                operands: [Some(Operand::ModRM), Some(Operand::ModReg), None, None],
             }),
             _ => Ok(Opcode {
                 ident: OpcodeType::Unknown,

@@ -34,7 +34,6 @@ impl ModRM {
             None => Addressing::EffAddr32Bit(EffAddr32Bit::from(value)),
         };
 
-        // TODO: Handle Register-Register operation
         // Get Mod
         let mod_addr = value >> 6 & 0b11;
 
