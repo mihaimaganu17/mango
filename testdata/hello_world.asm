@@ -21,6 +21,8 @@ _start:
     ; XOR instructions with a 0x35 prefix
     xor al, 0x1
     xor ax, 0x1000
+    xor bl, 0x1
+    xor bx, 0x1000
     xor eax, 0x100000
     xor rax, 0x5fffffff
 

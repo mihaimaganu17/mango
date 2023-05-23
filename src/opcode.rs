@@ -3,6 +3,7 @@ use crate::{
     prefix::{Prefix, Group1},
     reader::{Reader, ReaderError},
     rex::Rex,
+    modrm::Arch,
 };
 
 /// Represents a primary opcode in an x86_64 Architecture. The primary opcode can be 1, 2 or even
@@ -41,7 +42,40 @@ pub enum OpcodeType {
 #[derive(Debug)]
 pub struct Opcode {
     pub ident: OpcodeType,
-    pub operands: [Option<Operand>; 4],
+    pub encoding: Encoding,
+}
+
+pub struct Encoding {
+    arch: Arch,
+    op_en: OperandEncoding,
+}
+
+/// Describes the different encodings for the instruction operands
+#[derive(Debug, Clone, Copy)]
+pub enum OperandEncoding {
+    // Op1 = AL/AX/EAX/RAX, Op2 = imm8/16/32
+    I,
+    // Op1 = ModRM:r/m(r, w), Op2 = imm8/16/32
+    MI,
+    // Op1 = ModRM:r/m(r, w), Op2 = ModRM:reg(r)
+    MR,
+    // Op1 = ModRM:reg(r, w), Op2 = ModRM:r/m(r)
+    RM,
+}
+
+/// Defines a list of maximum 4 operands that can be used by an instruction.
+#[derive(Debug, PartialEq, Eq)]
+pub struct OperandList(Operand, Operand, Operand, Operand);
+
+// TODO: Make this consider operator size
+impl From<Encoding> for OperandList {
+    fn from(value: Encoding) -> Self {
+        match value.op_en {
+            Encoding::I => {
+                match value.arch {
+                    Arch::ArchOperandList(Operand::Reg, 
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -54,6 +88,8 @@ pub enum Operand {
     Opcode,
     // There is an Immediate integer following the opcode that represents the operand
     Immediate,
+    // The operand is a specific register or a set of registers
+    Reg(Reg),
 }
 
 #[derive(Debug)]
