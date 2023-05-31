@@ -1,11 +1,13 @@
 use crate::{
-    opcode::{Operand, Opcode, OpcodeType, OpcodeError},
+    opcode::{Operand, OperandSize, Opcode, OpcodeType, OpcodeError},
     prefix::Prefix,
     rex::Rex,
     reader::{Reader, ReaderError},
     modrm::{Arch, ModRM},
 };
 
+// By default, we are treating each instructions to be in a 32-bit environment. That being said,
+// any operator overload size prefix will work with 16-bit values.
 #[derive(Debug)]
 pub struct Instruction {
     // Optional prefix that can alter the instruction behaviour or can be specified to give a
@@ -56,11 +58,11 @@ impl Instruction {
             OpcodeType::Rex(op_rex) => {
                 // Initialize our own REX
                 maybe_rex = Some(op_rex);
-                 
+
                 // At this point we need to take into acount if we do have a prefix or not. This is
                 // because the prefix can change the opcode and the instruction
                 match maybe_prefix {
-                    Some(prefix) => Opcode::with_prefix(reader, prefix)?, 
+                    Some(prefix) => Opcode::with_prefix(reader, prefix)?,
                     None => Opcode::from_reader(reader)?,
                 }
             }
@@ -78,7 +80,6 @@ impl Instruction {
             false => None,
         };
 
-        
         Ok(Instruction {
             prefix: maybe_prefix,
             rex: maybe_rex,

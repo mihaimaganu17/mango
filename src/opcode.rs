@@ -3,8 +3,9 @@ use crate::{
     prefix::{Prefix, Group1},
     reader::{Reader, ReaderError},
     rex::Rex,
-    modrm::Arch,
+    reg::Reg,
 };
+use core::fmt::Debug;
 
 /// Represents a primary opcode in an x86_64 Architecture. The primary opcode can be 1, 2 or even
 /// 3 bytes in length. An additional 3-bit opcode field is sometimes encoded in the ModR/M byte.
@@ -42,40 +43,17 @@ pub enum OpcodeType {
 #[derive(Debug)]
 pub struct Opcode {
     pub ident: OpcodeType,
-    pub encoding: Encoding,
+    pub operands: [Option<Operand>; 4],
+    pub op_size: Option<OperandSize>,
 }
 
-pub struct Encoding {
-    arch: Arch,
-    op_en: OperandEncoding,
-}
-
-/// Describes the different encodings for the instruction operands
-#[derive(Debug, Clone, Copy)]
-pub enum OperandEncoding {
-    // Op1 = AL/AX/EAX/RAX, Op2 = imm8/16/32
-    I,
-    // Op1 = ModRM:r/m(r, w), Op2 = imm8/16/32
-    MI,
-    // Op1 = ModRM:r/m(r, w), Op2 = ModRM:reg(r)
-    MR,
-    // Op1 = ModRM:reg(r, w), Op2 = ModRM:r/m(r)
-    RM,
-}
-
-/// Defines a list of maximum 4 operands that can be used by an instruction.
 #[derive(Debug, PartialEq, Eq)]
-pub struct OperandList(Operand, Operand, Operand, Operand);
-
-// TODO: Make this consider operator size
-impl From<Encoding> for OperandList {
-    fn from(value: Encoding) -> Self {
-        match value.op_en {
-            Encoding::I => {
-                match value.arch {
-                    Arch::ArchOperandList(Operand::Reg, 
-        }
-    }
+pub enum OperandSize {
+    Byte,
+    Word,
+    DoubleWord,
+    QuadWord,
+    None,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -88,7 +66,7 @@ pub enum Operand {
     Opcode,
     // There is an Immediate integer following the opcode that represents the operand
     Immediate,
-    // The operand is a specific register or a set of registers
+    // The operand is a specific register
     Reg(Reg),
 }
 
@@ -125,6 +103,7 @@ impl Opcode {
             return Ok(Opcode {
                 ident: OpcodeType::Prefix(prefix),
                 operands: [None, None, None, None],
+                op_size: None,
             });
         }
 
@@ -137,6 +116,7 @@ impl Opcode {
             return Ok(Opcode {
                 ident: OpcodeType::Rex(rex),
                 operands: [None, None, None, None],
+                op_size: None,
             });
         }
 
@@ -145,13 +125,40 @@ impl Opcode {
         // calling function needs, in order to parse the rest of the bytes
         match byte {
             // XOR opcodes
+            0x30 => Ok(Opcode {
+                ident: OpcodeType::Xor,
+                operands: [Some(Operand::ModRM), Some(Operand::ModReg), None, None],
+                op_size: Some(OperandSize::Byte),
+            }),
             0x31 => Ok(Opcode {
                 ident: OpcodeType::Xor,
                 operands: [Some(Operand::ModRM), Some(Operand::ModReg), None, None],
+                op_size: Some(OperandSize::DoubleWord),
+            }),
+            0x32 => Ok(Opcode {
+                ident: OpcodeType::Xor,
+                operands: [Some(Operand::ModReg), Some(Operand::ModRM), None, None],
+                op_size: Some(OperandSize::Byte),
+            }),
+            0x33 => Ok(Opcode {
+                ident: OpcodeType::Xor,
+                operands: [Some(Operand::ModReg), Some(Operand::ModRM), None, None],
+                op_size: Some(OperandSize::DoubleWord),
+            }),
+            0x34 => Ok(Opcode {
+                ident: OpcodeType::Xor,
+                operands: [Some(Operand::Reg(Reg::AL)), Some(Operand::Immediate), None, None],
+                op_size: Some(OperandSize::Byte),
+            }),
+            0x35 => Ok(Opcode {
+                ident: OpcodeType::Xor,
+                operands: [Some(Operand::Reg(Reg::EAX)), Some(Operand::Immediate), None, None],
+                op_size: Some(OperandSize::DoubleWord),
             }),
             _ => Ok(Opcode {
                 ident: OpcodeType::Unknown,
                 operands: [None, None, None, None],
+                op_size: None,
             }),
         }
     }
@@ -173,6 +180,7 @@ impl Opcode {
                             Group1::RepNE => Ok(Opcode {
                                 ident: OpcodeType::Unknown,
                                 operands: [None, None, None, None],
+                                op_size: None,
                             }),
                             Group1::Rep => {
                                 let second_byte = reader.read::<u8>()?;
@@ -184,11 +192,13 @@ impl Opcode {
                                         match third_byte {
                                             0xFB => Ok(Opcode {
                                                 ident: OpcodeType::EndBr32,
-                                                operands: [None, None, None, None]
+                                                operands: [None, None, None, None],
+                                                op_size: None,
                                             }),
                                             0xFA => Ok(Opcode {
                                                 ident: OpcodeType::EndBr64,
-                                                operands: [None, None, None, None]
+                                                operands: [None, None, None, None],
+                                                op_size: None,
                                             }),
                                             _ => Err(OpcodeError::Invalid3ByteOpcode(
                                                     first_byte,
@@ -200,6 +210,7 @@ impl Opcode {
                                     _ => Ok(Opcode {
                                         ident: OpcodeType::Unknown,
                                         operands: [None, None, None, None],
+                                        op_size: None,
                                     }),
                                 }
                             }
@@ -209,6 +220,7 @@ impl Opcode {
                     Prefix::OpSize => Ok(Opcode {
                         ident: OpcodeType::Unknown,
                         operands: [None, None, None, None],
+                        op_size: None,
                     }),
                     // If we have an escape code, any other prefix is invalid for a 2-byte, 3-byte
                     // opcode

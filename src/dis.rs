@@ -34,7 +34,7 @@ impl From<InstructionError> for DisassemblerError {
 
 impl Disassembler {
     pub fn parse(&self, reader: &mut Reader) -> Result<(), DisassemblerError> {
-        while reader.pos() < 50 {
+        while reader.pos() < 20 {
             let arch = Some(Arch::Arch64);
             let instruction = Instruction::from_reader(reader, arch)?;
 

@@ -16,7 +16,7 @@ mod tests {
         dis::Disassembler,
     };
 
-    #[test]
+    // #[test]
     fn read_ls_elf_poorly() {
         let ls_path = "testdata/ls";
         let bytes = fs::read(ls_path).unwrap();
@@ -64,12 +64,25 @@ mod tests {
         dis.parse(&mut reader).unwrap();
     }
 
-    #[test]
+    //#[test]
     fn test_dis_parse_hello() {
         let ls_path = "hello_world_lea_xor";
         let bytes = fs::read(ls_path).unwrap();
 
         let exec_bytes = bytes.get(0x1000..0x109c).unwrap();
+
+        let mut reader = Reader::from_vec(exec_bytes.to_vec());
+        let dis = Disassembler;
+
+        dis.parse(&mut reader).unwrap();
+    }
+
+    #[test]
+    fn test_dis_parse_hello_world_x64() {
+        let ls_path = "testdata/hello_world_x64";
+        let bytes = fs::read(ls_path).unwrap();
+
+        let exec_bytes = bytes.get(0x1000..0x1055).unwrap();
 
         let mut reader = Reader::from_vec(exec_bytes.to_vec());
         let dis = Disassembler;

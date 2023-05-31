@@ -1,6 +1,16 @@
 use crate::modrm::Arch;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq])]
+pub enum GenReg {
+    byte: B,
+    word: W,
+    dword: DW,
+    qword: QW,
+}
+
+// TODO: Refactor registers, such that we can group them by size of register
+// https://www.eecg.utoronto.ca/~amza/www.mindsec.com/files/x86regs.html
+#[derive(Debug, PartialEq, Eq)]
 pub enum Reg {
     AL,
     AX,
