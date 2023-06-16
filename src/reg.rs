@@ -1,6 +1,6 @@
-use crate::modrm::Arch;
+use crate::{opcode::OpSize, modrm::Arch};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Reg {
     AL,
     AX,
@@ -58,6 +58,48 @@ pub enum Reg {
     R13,
     R14,
     R15,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RegFamily {
+    Accumulator,
+}
+
+impl RegFamily {
+    pub fn reg_from(&self, op_size: &OpSize) -> Reg {
+        match self {
+            Self::Accumulator => Accumulator::from_opsize(op_size),
+        }
+    }
+}
+
+pub trait Gpr {
+    const Reg8BitLo: Reg;
+    const Reg8BitHi: Reg;
+    const Reg16Bit: Reg;
+    const Reg32Bit: Reg;
+    const Reg64Bit: Reg;
+
+    fn from_opsize(op_size: &OpSize) -> Reg {
+        match op_size {
+            OpSize::U8 => Self::Reg8BitLo,
+            OpSize::U16 => Self::Reg16Bit,
+            OpSize::U32 => Self::Reg32Bit,
+            OpSize::U64 => Self::Reg64Bit, 
+            _ => Self::Reg32Bit,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Accumulator;
+
+impl Gpr for Accumulator {
+    const Reg8BitLo: Reg = Reg::AL;
+    const Reg8BitHi: Reg = Reg::AH;
+    const Reg16Bit: Reg = Reg::AX;
+    const Reg32Bit: Reg = Reg::EAX;
+    const Reg64Bit: Reg = Reg::RAX;
 }
 
 impl Reg {

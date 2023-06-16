@@ -38,7 +38,7 @@ impl Disassembler {
             let arch = Some(Arch::Arch64);
             let instruction = Instruction::from_reader(reader, arch)?;
 
-            println!("Instruction: {:?}", instruction);
+            println!("{:#x?}", instruction);
         }
 
         // First we try and read the prefix

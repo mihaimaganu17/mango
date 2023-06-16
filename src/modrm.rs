@@ -16,7 +16,7 @@ use crate::rex::Rex;
 /// The `r/m` field can specify a register as an operand or it can be combined with the mod field
 /// to encode an addressing mode
 #[derive(Debug)]
-pub struct ModRM(Reg, Addressing);
+pub struct ModRM(pub Reg, pub Addressing);
 
 impl ModRM {
     pub fn from_byte_with_arch(value: u8, maybe_arch: Option<Arch>, maybe_rex: Option<Rex>) -> Self {
@@ -53,6 +53,8 @@ impl ModRM {
 
         Self(Reg::from_byte_with_arch(reg, maybe_arch), addressing)
     }
+
+
 }
 
 #[derive(Debug)]
@@ -62,6 +64,41 @@ pub enum Addressing {
     EffAddr64Bit(EffAddr64Bit),
 }
 
+impl Addressing {
+    /// Returns the displacement based on addressing type or `None` if it does not exist
+    pub fn displacement(&self) -> Option<DispArch> {
+        // Check for the addressing type
+        match self {
+            Self::EffAddr16Bit(addr_16bit) => {
+                addr_16bit.2
+            }
+            Self::EffAddr32Bit(addr_32bit) => {
+                addr_32bit.1
+            }
+            Self::EffAddr64Bit(addr_64bit) => {
+                addr_64bit.1
+            }
+        }
+    }
+
+    /// If the CPU is in 32-bit or 64-bit addressing form, there is a chance the SIB byte is
+    /// present, to aid the creation of the address.
+    pub fn has_sib(&self) -> bool {
+        match self {
+            Self::EffAddr32Bit(EffAddr32Bit(eff_addr, _))
+            | Self::EffAddr64Bit(EffAddr64Bit(eff_addr, _)) => {
+                if let EffAddrType::Sib = eff_addr {
+                    return true
+                } else {
+                    return false
+                }
+            }
+            _ => false
+        }
+    }
+}
+
+// TODO: This should be places in some cpu.rs or arch.rs file
 #[derive(Debug, Clone, Copy)]
 pub enum Arch {
     Arch16,
@@ -401,70 +438,101 @@ impl EffAddr64Bit {
 ///
 /// Certain encodings of the ModR/M byte require a second addressing byte (the SIB byte). The
 /// base-plus-index and scale-plus-index forms of 32-bit addressing require the SIB byte.
-pub struct SIB(u8);
+#[derive(Debug)]
+pub enum Sib {
+    Sib32(Sib32),
+    Sib64(Sib64),
+}
 
 // This represents the top 2 bits(Scale parameter) of the SIB byte in an x86_64 instruction
+#[derive(Debug)]
 pub struct Scale(u8);
-pub struct ScaledIndex(Option<Reg>, Option<Scale>);
+        
+/// Represents a 32-bit Sib byte components
+// TODO: We should make this version and the 64-bit version into generics
+#[derive(Debug)]
+pub struct Sib32 {
+    base: Option<Reg>,
+    scaled_index: Option<Reg>,
+    scale: Option<Scale>
+}
 
-impl From<u8> for ScaledIndex {
+impl From<u8> for Sib32 {
     fn from(value: u8) -> Self {
         let scale = (value >> 6) & 0b11;
         let idx = (value >> 3) & 0b111;
+        let base = value & 0b111;
+
+        let base = match base {
+            0b000 => Some(Reg::EAX),
+            0b001 => Some(Reg::ECX),
+            0b010 => Some(Reg::EDX),
+            0b011 => Some(Reg::EBX),
+            0b100 => Some(Reg::ESP),
+            0b101 => Some(Reg::EBP),
+            0b110 => Some(Reg::ESI),
+            0b111 => Some(Reg::EDI),
+            _ => unreachable!(),
+        };
 
         let scaled_index = match scale {
             0b00 => match idx {
-                0b000 => Self(Some(Reg::EAX), None),
-                0b001 => Self(Some(Reg::ECX), None),
-                0b010 => Self(Some(Reg::EDX), None),
-                0b011 => Self(Some(Reg::EBX), None),
-                0b100 => Self(None, None),
-                0b101 => Self(Some(Reg::EBP), None),
-                0b110 => Self(Some(Reg::ESI), None),
-                0b111 => Self(Some(Reg::EDI), None),
+                0b000 => (Some(Reg::EAX), None),
+                0b001 => (Some(Reg::ECX), None),
+                0b010 => (Some(Reg::EDX), None),
+                0b011 => (Some(Reg::EBX), None),
+                0b100 => (None, None),
+                0b101 => (Some(Reg::EBP), None),
+                0b110 => (Some(Reg::ESI), None),
+                0b111 => (Some(Reg::EDI), None),
                 _ => unreachable!(),
             }
             0b01 => match idx {
-                0b000 => Self(Some(Reg::EAX), Some(Scale(2))),
-                0b001 => Self(Some(Reg::ECX), Some(Scale(2))),
-                0b010 => Self(Some(Reg::EDX), Some(Scale(2))),
-                0b011 => Self(Some(Reg::EBX), Some(Scale(2))),
-                0b100 => Self(None, None),
-                0b101 => Self(Some(Reg::EBP), Some(Scale(2))),
-                0b110 => Self(Some(Reg::ESI), Some(Scale(2))),
-                0b111 => Self(Some(Reg::EDI), Some(Scale(2))),
+                0b000 => (Some(Reg::EAX), Some(Scale(2))),
+                0b001 => (Some(Reg::ECX), Some(Scale(2))),
+                0b010 => (Some(Reg::EDX), Some(Scale(2))),
+                0b011 => (Some(Reg::EBX), Some(Scale(2))),
+                0b100 => (None, None),
+                0b101 => (Some(Reg::EBP), Some(Scale(2))),
+                0b110 => (Some(Reg::ESI), Some(Scale(2))),
+                0b111 => (Some(Reg::EDI), Some(Scale(2))),
                 _ => unreachable!(),
             }
             0b10 => match idx {
-                0b000 => Self(Some(Reg::EAX), Some(Scale(4))),
-                0b001 => Self(Some(Reg::ECX), Some(Scale(4))),
-                0b010 => Self(Some(Reg::EDX), Some(Scale(4))),
-                0b011 => Self(Some(Reg::EBX), Some(Scale(4))),
-                0b100 => Self(None, None),
-                0b101 => Self(Some(Reg::EBP), Some(Scale(4))),
-                0b110 => Self(Some(Reg::ESI), Some(Scale(4))),
-                0b111 => Self(Some(Reg::EDI), Some(Scale(4))),
+                0b000 => (Some(Reg::EAX), Some(Scale(4))),
+                0b001 => (Some(Reg::ECX), Some(Scale(4))),
+                0b010 => (Some(Reg::EDX), Some(Scale(4))),
+                0b011 => (Some(Reg::EBX), Some(Scale(4))),
+                0b100 => (None, None),
+                0b101 => (Some(Reg::EBP), Some(Scale(4))),
+                0b110 => (Some(Reg::ESI), Some(Scale(4))),
+                0b111 => (Some(Reg::EDI), Some(Scale(4))),
                 _ => unreachable!(),
             }
             0b11 => match idx {
-                0b000 => Self(Some(Reg::EAX), Some(Scale(8))),
-                0b001 => Self(Some(Reg::ECX), Some(Scale(8))),
-                0b010 => Self(Some(Reg::EDX), Some(Scale(8))),
-                0b011 => Self(Some(Reg::EBX), Some(Scale(8))),
-                0b100 => Self(None, None),
-                0b101 => Self(Some(Reg::EBP), Some(Scale(8))),
-                0b110 => Self(Some(Reg::ESI), Some(Scale(8))),
-                0b111 => Self(Some(Reg::EDI), Some(Scale(8))),
+                0b000 => (Some(Reg::EAX), Some(Scale(8))),
+                0b001 => (Some(Reg::ECX), Some(Scale(8))),
+                0b010 => (Some(Reg::EDX), Some(Scale(8))),
+                0b011 => (Some(Reg::EBX), Some(Scale(8))),
+                0b100 => (None, None),
+                0b101 => (Some(Reg::EBP), Some(Scale(8))),
+                0b110 => (Some(Reg::ESI), Some(Scale(8))),
+                0b111 => (Some(Reg::EDI), Some(Scale(8))),
                 _ => unreachable!(),
             }
             _ => unreachable!(),
         };
 
-        scaled_index
+        Self {
+            base,
+            scaled_index: scaled_index.0,
+            scale: scaled_index.1,
+        }
     }
 }
 
 /// Represents a 64-bit scaled index
+#[derive(Debug)]
 pub struct Sib64 {
     base: Option<Reg>,
     scaled_index: Option<Reg>,
@@ -472,7 +540,7 @@ pub struct Sib64 {
 }
 
 impl Sib64 {
-    fn from_byte_with_rex(value: u8, maybe_rex: Option<Rex>) -> Self {
+    pub fn from_byte_with_rex(value: u8, maybe_rex: Option<Rex>) -> Self {
         let scale = (value >> 6) & 0b11;
 
         let mut idx = (value >> 3) & 0b111;

@@ -3,6 +3,7 @@ use crate::{
     prefix::{Prefix, Group1},
     reader::{Reader, ReaderError},
     rex::Rex,
+    reg::{Reg, RegFamily, Accumulator, Gpr},
     modrm::Arch,
 };
 
@@ -42,54 +43,93 @@ pub enum OpcodeType {
 #[derive(Debug)]
 pub struct Opcode {
     pub ident: OpcodeType,
-    pub encoding: Encoding,
-}
-
-pub struct Encoding {
-    arch: Arch,
-    op_en: OperandEncoding,
+    pub operands: [Option<Operand>; 4],
+    pub encoding: Option<OperandEncoding>,
 }
 
 /// Describes the different encodings for the instruction operands
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OperandEncoding {
     // Op1 = AL/AX/EAX/RAX, Op2 = imm8/16/32
     I,
     // Op1 = ModRM:r/m(r, w), Op2 = imm8/16/32
-    MI,
+    MI(RegFieldExt),
     // Op1 = ModRM:r/m(r, w), Op2 = ModRM:reg(r)
     MR,
     // Op1 = ModRM:reg(r, w), Op2 = ModRM:r/m(r)
     RM,
+    // Zero operators
+    ZO,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct RegFieldExt(u8);
+
+#[derive(Debug)]
+pub enum RegFieldExtError {
+    CannotConvertFrom(u8),
+}
+
+impl TryFrom<u8> for RegFieldExt {
+    type Error = RegFieldExtError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0..=7 => Ok(Self(value)),
+            _ => Err(RegFieldExtError::CannotConvertFrom(value)),
+        }
+    }
+}
+
+/// The operator size of the opcode is determined by 2 characteristics:
+/// - The CPU Mode
+/// - The OperandSize override prefix, which alternates the state between the 16-bit and the 32-bit
+/// states of the CPU
+/// - The Opcode identifier itself.
+/// The current module, only controls the last one and the first 2 have to be addressed in the
+/// `Intruction` module
+#[derive(Debug, PartialEq, Eq)]
+pub enum OpSize {
+    U8,
+    U16,
+    U32,
+    U64,
+    I8,
+    I16,
+    I32,
+    I64,
+    CpuMode,
+}
+
+impl From<Arch> for OpSize {
+    fn from(value: Arch) -> Self {
+        match value {
+            Arch::Arch16 => Self::U16,
+            Arch::Arch32 => Self::U32,
+            Arch::Arch64 => Self::U64,
+        }
+    }
 }
 
 /// Defines a list of maximum 4 operands that can be used by an instruction.
 #[derive(Debug, PartialEq, Eq)]
 pub struct OperandList(Operand, Operand, Operand, Operand);
 
-// TODO: Make this consider operator size
-impl From<Encoding> for OperandList {
-    fn from(value: Encoding) -> Self {
-        match value.op_en {
-            Encoding::I => {
-                match value.arch {
-                    Arch::ArchOperandList(Operand::Reg, 
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum Operand {
     // Represents a register or a memory operand found in the R/M field of ModR/M
-    ModRM,
+    ModRM(OpSize),
     // Represents a register from the `reg` part of the ModRM field
-    ModReg,
+    ModReg(OpSize),
     // The operand is embedded in the opcode
-    Opcode,
+    Opcode(OpSize),
     // There is an Immediate integer following the opcode that represents the operand
-    Immediate,
+    Immediate(OpSize),
     // The operand is a specific register or a set of registers
     Reg(Reg),
+    // The operand is a family of registers and reffers to General Purpose Registers
+    RegFamily(RegFamily),
 }
 
 #[derive(Debug)]
@@ -125,6 +165,7 @@ impl Opcode {
             return Ok(Opcode {
                 ident: OpcodeType::Prefix(prefix),
                 operands: [None, None, None, None],
+                encoding: None,
             });
         }
 
@@ -137,6 +178,7 @@ impl Opcode {
             return Ok(Opcode {
                 ident: OpcodeType::Rex(rex),
                 operands: [None, None, None, None],
+                encoding: None,
             });
         }
 
@@ -147,11 +189,28 @@ impl Opcode {
             // XOR opcodes
             0x31 => Ok(Opcode {
                 ident: OpcodeType::Xor,
-                operands: [Some(Operand::ModRM), Some(Operand::ModReg), None, None],
+                operands: [Some(Operand::ModRM(OpSize::CpuMode)), Some(Operand::ModReg(OpSize::CpuMode)), None, None],
+                encoding: Some(OperandEncoding::MR),
+            }),
+            0x34 => Ok(Opcode {
+                ident: OpcodeType::Xor,
+                operands: [Some(Operand::Reg(Accumulator::Reg8BitLo)), Some(Operand::Immediate(OpSize::U8)), None, None],
+                encoding: Some(OperandEncoding::I),
+            }),
+            0x35 => Ok(Opcode {
+                ident: OpcodeType::Xor,
+                operands: [Some(Operand::RegFamily(RegFamily::Accumulator)), Some(Operand::Immediate(OpSize::U32)), None, None],
+                encoding: Some(OperandEncoding::I),
+            }),
+            0x80 => Ok(Opcode {
+                ident: OpcodeType::NeedsModRMExtension,
+                operands: [None, None, None, None],
+                encoding: None,
             }),
             _ => Ok(Opcode {
                 ident: OpcodeType::Unknown,
                 operands: [None, None, None, None],
+                encoding: None,
             }),
         }
     }
@@ -173,6 +232,7 @@ impl Opcode {
                             Group1::RepNE => Ok(Opcode {
                                 ident: OpcodeType::Unknown,
                                 operands: [None, None, None, None],
+                                encoding: None,
                             }),
                             Group1::Rep => {
                                 let second_byte = reader.read::<u8>()?;
@@ -184,11 +244,13 @@ impl Opcode {
                                         match third_byte {
                                             0xFB => Ok(Opcode {
                                                 ident: OpcodeType::EndBr32,
-                                                operands: [None, None, None, None]
+                                                operands: [None, None, None, None],
+                                                encoding: Some(OperandEncoding::ZO),
                                             }),
                                             0xFA => Ok(Opcode {
                                                 ident: OpcodeType::EndBr64,
-                                                operands: [None, None, None, None]
+                                                operands: [None, None, None, None],
+                                                encoding: Some(OperandEncoding::ZO),
                                             }),
                                             _ => Err(OpcodeError::Invalid3ByteOpcode(
                                                     first_byte,
@@ -200,6 +262,7 @@ impl Opcode {
                                     _ => Ok(Opcode {
                                         ident: OpcodeType::Unknown,
                                         operands: [None, None, None, None],
+                                        encoding: None,
                                     }),
                                 }
                             }
@@ -209,6 +272,7 @@ impl Opcode {
                     Prefix::OpSize => Ok(Opcode {
                         ident: OpcodeType::Unknown,
                         operands: [None, None, None, None],
+                        encoding: None,
                     }),
                     // If we have an escape code, any other prefix is invalid for a 2-byte, 3-byte
                     // opcode

@@ -2,29 +2,14 @@ section .text
 global _start
 
 _start:
-    ; LEA Instructions to identify addressing
-    lea eax, [edx*8]
-    lea ecx, [eax]
-    lea edx, [edx + 8*EAX + 4]
-    lea ebx, [rax]  
-    lea rbx, [rax]  
-    lea rbx, [rax * 8]  
-    lea rbx, [r10 * 8]  
-    lea r9, [r8]  
-    lea r12, [r12]  
-    lea r13, [r13]  
-    lea r12, [r12*4 + 10]  
-    lea r13, [rax + r13*8 + 3]  
-    lea r12, [rbp + r12*8 + 3]  
-    lea rsp, [ebp + ebp*8 + 3]  
- 
     ; XOR instructions with a 0x35 prefix
     xor al, 0x1
     xor ax, 0x1000
-    xor bl, 0x1
-    xor bx, 0x1000
     xor eax, 0x100000
     xor rax, 0x5fffffff
+
+    xor bl, 0x1
+    xor bx, 0x1000
 
     ; 0x80 prefix
     xor bl, 0x1
@@ -43,7 +28,24 @@ _start:
     xor ax, bx
     xor eax, ebx
     xor rax, rbx
+
+    ; LEA Instructions to identify addressing
+    lea eax, [edx*8]
+    lea ecx, [eax]
+    lea edx, [edx + 8*EAX + 4]
+    lea ebx, [rax]  
+    lea rbx, [rax]  
+    lea rbx, [rax * 8]  
+    lea rbx, [r10 * 8]  
+    lea r9, [r8]  
+    lea r12, [r12]  
+    lea r13, [r13]  
+    lea r12, [r12*4 + 10]  
+    lea r13, [rax + r13*8 + 3]  
+    lea r12, [rbp + r12*8 + 3]  
+    lea rsp, [ebp + ebp*8 + 3]   
     
+    ; Hello World Code
     mov rdi, 0x1
     mov rsi, hello
     mov rdx, helloLen
