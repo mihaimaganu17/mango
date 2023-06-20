@@ -20,7 +20,7 @@
 /// INC/DEC functionality is still available using ModR/M forms of the same instructions
 /// (opcodes FF/0 and FF/1)
 /// The bits in position [4:8] are always 0100
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rex {
     // This value represents a single bit, with the following values:
     // - 0: Operand size determined by CS.d(either 16-bit or 32-bit).

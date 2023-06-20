@@ -53,20 +53,30 @@ impl From<ReaderError> for DispError {
 /// bytes. An immediate operand can be 1, 2 or 4 bytes
 #[derive(Debug, PartialEq, Eq)]
 pub enum Immediate {
-    Imm8(u8),
-    Imm16(u16),
-    Imm32(u32),
-    ImmI64(i64),
+    ImmU8(u8),
+    ImmU16(u16),
+    ImmU32(u32),
+    ImmI8(i8),
+    ImmI16(i16),
+    ImmI32(i32),
 }
 
 impl Immediate {
     pub fn parse(op_size: &OpSize, reader: &mut Reader) -> Result<Self, ImmError> {
         match op_size {
-            OpSize::U8 => Ok(Immediate::Imm8(reader.read::<u8>()?)),
-            OpSize::U16 => Ok(Immediate::Imm16(reader.read::<u16>()?)),
-            OpSize::U32 => Ok(Immediate::Imm32(reader.read::<u32>()?)),
+            OpSize::U8 => Ok(Immediate::ImmU8(reader.read::<u8>()?)),
+            OpSize::U16 => Ok(Immediate::ImmU16(reader.read::<u16>()?)),
+            OpSize::U32 => Ok(Immediate::ImmU32(reader.read::<u32>()?)),
             OpSize::U64 => Ok(Immediate::ImmI32(reader.read::<i32>()?)),
-            _ => todo!(),
+            OpSize::I8 => Ok(Immediate::ImmI8(reader.read::<i8>()?)),
+            OpSize::I16 => Ok(Immediate::ImmI16(reader.read::<i16>()?)),
+            OpSize::I32 => Ok(Immediate::ImmI32(reader.read::<i32>()?)),
+            OpSize::I64 => Ok(Immediate::ImmI32(reader.read::<i32>()?)),
+            OpSize::CpuMode => Ok(Immediate::ImmI32(reader.read::<i32>()?)),
+            _ => {
+                println!("OpSize: {op_size:?}");
+                todo!();
+            }
         }
     }
 }

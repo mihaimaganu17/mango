@@ -77,7 +77,7 @@ impl Instruction {
 
         // At this point we know that the second opcode cannot be a normal prefix.
         // However, it can be a REX prefix, so we also want to check for that
-        let third_opcode = match second_opcode.ident {
+        let mut third_opcode = match second_opcode.ident {
             // If we got a rex prefix, we read again the next opcode
             OpcodeType::Rex(op_rex) => {
                 // Initialize our own REX
@@ -93,7 +93,28 @@ impl Instruction {
             _ => second_opcode,
         };
 
-        let modrm_encodings = [OperandEncoding::MI(RegFieldExt::try_from(6)?), OperandEncoding::MR, OperandEncoding::RM, OperandEncoding::ZO];
+        // Save the ident in a local variable
+        let ident = third_opcode.ident;
+
+        // We need to filter the opcode, yet again to check if we need an extension from the
+        // ModRM byte, which is the next byte
+        if let OpcodeType::NeedsModRMExtension(_) = ident {
+            // We just peak the modrm byte
+            let modrm_byte = reader.peek::<u8>()?;
+
+            // Get the reg part from the ModRM byte
+            let reg = (modrm_byte >> 3) & 0b111;
+
+            third_opcode.convert_with_ext(RegFieldExt::try_from(reg)?)?;
+        }
+
+        let modrm_encodings = [
+            OperandEncoding::MI,
+            OperandEncoding::MR,
+            OperandEncoding::RM,
+            OperandEncoding::ZO
+        ];
+
 
         // Initialize the ModRM field
         let mut maybe_modrm = None;
@@ -109,7 +130,6 @@ impl Instruction {
 
                 // Parse the ModRM byte
                 let modrm = ModRM::from_byte_with_arch(modrm_byte, maybe_arch, maybe_rex);
-
 
                 // Based on the addressing mode of the CPU, we have to/or not read the SIB byte
                 if let Some(arch) = maybe_arch {
@@ -169,7 +189,7 @@ impl Instruction {
             // If we have a prefix, with the REX.X = 1 field set, the operand override prefix is
             // ignored
             if let Some(rex) = maybe_rex {
-                if rex.x() == 1 {
+                if rex.w() == 1 {
                     op_size_override = OpSize::U64;
                 }
             }
@@ -189,6 +209,9 @@ impl Instruction {
                     ResolvedOperand::Reg(reg)
                 }
                 Operand::Reg(reg) => ResolvedOperand::Reg(*reg),
+                // We need to convert the RM field from ModRM into the correct register, based on
+                // operand size
+                Operand::ModRM(op_size) => ResolvedOperand::ToBeDecided,
                 _ => ResolvedOperand::ToBeDecided,
             }
         }).collect::<Vec<_>>();

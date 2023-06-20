@@ -96,6 +96,11 @@ impl Addressing {
             _ => false
         }
     }
+
+    /// Returns the register of the R/M field in ModRM, if if exists, otherwise `None`
+    pub fn reg(&self) -> Option<Reg> {
+        None
+    }
 }
 
 // TODO: This should be places in some cpu.rs or arch.rs file

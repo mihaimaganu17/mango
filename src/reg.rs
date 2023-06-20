@@ -58,6 +58,10 @@ pub enum Reg {
     R13,
     R14,
     R15,
+    SIL,
+    DIL,
+    SPL,
+    BPL,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -102,7 +106,97 @@ impl Gpr for Accumulator {
     const Reg64Bit: Reg = Reg::RAX;
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Counter;
+
+impl Gpr for Counter {
+    const Reg8BitLo: Reg = Reg::CL;
+    const Reg8BitHi: Reg = Reg::CH;
+    const Reg16Bit: Reg = Reg::CX;
+    const Reg32Bit: Reg = Reg::ECX;
+    const Reg64Bit: Reg = Reg::RCX;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Data;
+
+impl Gpr for Data {
+    const Reg8BitLo: Reg = Reg::DL;
+    const Reg8BitHi: Reg = Reg::DH;
+    const Reg16Bit: Reg = Reg::DX;
+    const Reg32Bit: Reg = Reg::EDX;
+    const Reg64Bit: Reg = Reg::RDX;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Base;
+
+impl Gpr for Base {
+    const Reg8BitLo: Reg = Reg::BL;
+    const Reg8BitHi: Reg = Reg::BH;
+    const Reg16Bit: Reg = Reg::BX;
+    const Reg32Bit: Reg = Reg::EBX;
+    const Reg64Bit: Reg = Reg::RBX;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StackPointer;
+
+impl Gpr for StackPointer {
+    const Reg8BitLo: Reg = Reg::SPL;
+    const Reg8BitHi: Reg = Reg::SP;
+    const Reg16Bit: Reg = Reg::SP;
+    const Reg32Bit: Reg = Reg::ESP;
+    const Reg64Bit: Reg = Reg::RSP;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BasePointer;
+
+impl Gpr for BasePointer {
+    const Reg8BitLo: Reg = Reg::BPL;
+    const Reg8BitHi: Reg = Reg::BP;
+    const Reg16Bit: Reg = Reg::BP;
+    const Reg32Bit: Reg = Reg::EBP;
+    const Reg64Bit: Reg = Reg::RBP;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Source;
+
+impl Gpr for Source {
+    const Reg8BitLo: Reg = Reg::SIL;
+    const Reg8BitHi: Reg = Reg::SI;
+    const Reg16Bit: Reg = Reg::SI;
+    const Reg32Bit: Reg = Reg::ESI;
+    const Reg64Bit: Reg = Reg::RSI;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Destination;
+
+impl Gpr for Destination {
+    const Reg8BitLo: Reg = Reg::DIL;
+    const Reg8BitHi: Reg = Reg::DI;
+    const Reg16Bit: Reg = Reg::DI;
+    const Reg32Bit: Reg = Reg::EDI;
+    const Reg64Bit: Reg = Reg::RDI;
+}
+
 impl Reg {
+    pub fn convert_with_opsize(self, op_size: &OpSize) -> Reg {
+        match self {
+            Reg::AL | Reg::AH | Reg::AX | Reg::EAX | Reg::RAX => Accumulator::from_opsize(op_size),
+            Reg::CL | Reg::CH | Reg::CX | Reg::ECX | Reg::RCX => Counter::from_opsize(op_size),
+            Reg::DL | Reg::DH | Reg::DX | Reg::EDX | Reg::RDX => Data::from_opsize(op_size),
+            Reg::BL | Reg::BH | Reg::BX | Reg::EBX | Reg::RBX => Base::from_opsize(op_size),
+            Reg::SPL | Reg::SP | Reg::ESP | Reg::RSP => StackPointer::from_opsize(op_size),
+            Reg::BPL | Reg::BP | Reg::EBP | Reg::RBP => BasePointer::from_opsize(op_size),
+            Reg::SIL | Reg::SI | Reg::ESI | Reg::RSI => Source::from_opsize(op_size),
+            Reg::DIL | Reg::DI | Reg::EDI | Reg::RDI => Destination::from_opsize(op_size),
+            _ => todo!(),
+        }
+    }
     // Convert the value to a register, specified by r/m16
     // A word general-purpose register or memory operand used for instructions whose operand-size
     // attribute is 16 bits. The word general-purpose registers are: AX, CX, DX, BX, SP, BP, SI,

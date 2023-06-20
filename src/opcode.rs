@@ -22,16 +22,23 @@ use crate::{
 ///
 /// Three-bytes opcode formats are just like above, but instead of 1 bytes following the escape
 /// code, there are 2 bytes
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpcodeType {
     // A prefix byte for special operations or extending the instruction encoding
     Prefix(Prefix),
     // A REX prefix used to configure 64-bit mode operations
     Rex(Rex),
+    Add,
+    Or,
+    Adc,
+    Sbb,
+    And,
+    Sub,
+    Cmp,
     // A bitwise XOR between 2 operands
     Xor,
     // The opcode alone is not enough and it needs an Extension from a ModRM field
-    NeedsModRMExtension,
+    NeedsModRMExtension(u8),
     // Terminate an indirect branch in 32 bit and compatibility mode.
     EndBr32,
     // Terminate an indirect branch in 64 bit mode.
@@ -47,13 +54,36 @@ pub struct Opcode {
     pub encoding: Option<OperandEncoding>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AddressingMethod {
+    // A ModR/M byte follows the opcode and specifies the operand. The operand is either a
+    // general-purpose register or a memory address.
+    E,
+    // The reg field of the ModR/M byte selects a general register (for example, AX (000))
+    G,
+    // Immediate data: the operand value is encoded in subsequent bytes of the instruction.
+    I,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OperandType {
+    // Byte, regardless of operand-size attribute.
+    B,
+    // Doubleword, regardless of operand-size attribute.
+    D,
+    // Word, doubleword or quadword (in 64-bit mode), depending on operand-size attribute
+    V,
+    // Word for 16-bit operand-size or doubleword for 32 or 64-bit operand-size.
+    Z,
+}
+
 /// Describes the different encodings for the instruction operands
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OperandEncoding {
     // Op1 = AL/AX/EAX/RAX, Op2 = imm8/16/32
     I,
     // Op1 = ModRM:r/m(r, w), Op2 = imm8/16/32
-    MI(RegFieldExt),
+    MI,
     // Op1 = ModRM:r/m(r, w), Op2 = ModRM:reg(r)
     MR,
     // Op1 = ModRM:reg(r, w), Op2 = ModRM:r/m(r)
@@ -106,8 +136,8 @@ impl From<Arch> for OpSize {
     fn from(value: Arch) -> Self {
         match value {
             Arch::Arch16 => Self::U16,
-            Arch::Arch32 => Self::U32,
-            Arch::Arch64 => Self::U64,
+            // In both 32-bit and 64-bit mode, the default operand size, is 32-bit,
+            Arch::Arch32 | Arch::Arch64 => Self::U32,
         }
     }
 }
@@ -130,6 +160,23 @@ pub enum Operand {
     Reg(Reg),
     // The operand is a family of registers and reffers to General Purpose Registers
     RegFamily(RegFamily),
+}
+
+impl Operand {
+    pub fn from_map(addr_meth: AddressingMethod, op_type: OperandType) -> Self {
+        let op_size = match op_type {
+            OperandType::B => OpSize::U8,
+            OperandType::V
+            | OperandType::Z => OpSize::CpuMode,
+            OperandType::D => OpSize::U32,
+        };
+
+        match addr_meth {
+            AddressingMethod::E => Operand::ModRM(op_size),
+            AddressingMethod::G => Operand::ModReg(op_size),
+            AddressingMethod::I => Operand::Immediate(op_size),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -203,7 +250,7 @@ impl Opcode {
                 encoding: Some(OperandEncoding::I),
             }),
             0x80 => Ok(Opcode {
-                ident: OpcodeType::NeedsModRMExtension,
+                ident: OpcodeType::NeedsModRMExtension(byte),
                 operands: [None, None, None, None],
                 encoding: None,
             }),
@@ -213,6 +260,39 @@ impl Opcode {
                 encoding: None,
             }),
         }
+    }
+
+    pub fn convert_with_ext(&mut self, ext: RegFieldExt) -> Result<(), OpcodeError> {
+        // We know the following extensions only have 2 operands
+        match self.ident {
+            OpcodeType::NeedsModRMExtension(byte) => {
+                match byte {
+                    0x80 => {
+                        self.operands[0] = Some(Operand::from_map(AddressingMethod::E, OperandType::B));
+                        self.operands[1] = Some(Operand::from_map(AddressingMethod::I, OperandType::B));
+                        self.encoding = Some(OperandEncoding::MI);
+                    }
+                    _ => {},
+                }
+            }
+            _ => {},
+        };
+
+        self.ident = match ext.0 {
+            0 => OpcodeType::Add,
+            1 => OpcodeType::Or,
+            2 => OpcodeType::Adc,
+            3 => OpcodeType::Sbb,
+            4 => OpcodeType::And,
+            5 => OpcodeType::Sub,
+            6 => OpcodeType::Xor,
+            7 => OpcodeType::Cmp,
+            _ => unreachable!(),
+        };
+
+        println!("{:#x?}", self); 
+
+        Ok(())
     }
 
     /// Special function that returns results based on the read prefix. This typically, and

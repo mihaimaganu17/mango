@@ -2,7 +2,7 @@
 
 /// Represents instruction prefixes of 1 byte each. They are divided into four groups, each
 /// with a set of allowable prefix codes.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Prefix {
     // Lock, repeat and BND prefixes
     Group1(Group1),
@@ -47,7 +47,7 @@ pub enum PrefixError {
     InvalidPrefix,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Group1 {
     // Forces an operation that ensures exclusive use of shared memory in a multiprocessor
     // environment.
@@ -73,7 +73,7 @@ impl TryFrom<u8> for Group1 {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Group2 {
     // CS Segment override(used with any branch instruction) or
     // Branch not taken(on older microarchitectures, used only with Jcc instructions)

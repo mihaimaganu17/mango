@@ -56,6 +56,8 @@ impl Reader {
 
     /// Reads `size` bytes from the buffer that back this `Reader`, without moving the buffer
     /// pointer forward
+    // Maybe we can have a buffered read, that reads chunks and whenever we need to peak at a byte,
+    // we just return the element and the cursor, without re-reading it
     pub fn peek_bytes(&self, size: usize) -> Result<&[u8], ReaderError> {
         // Try and read the desired bytes
         let bytes_read = self
