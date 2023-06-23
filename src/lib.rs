@@ -69,7 +69,7 @@ mod tests {
         let ls_path = "hello_world_lea_xor";
         let bytes = fs::read(ls_path).unwrap();
 
-        let exec_bytes = bytes.get(0x1000..0x109c).unwrap();
+        let exec_bytes = bytes.get(0x1038..0x109c).unwrap();
 
         let mut reader = Reader::from_vec(exec_bytes.to_vec());
         let dis = Disassembler;

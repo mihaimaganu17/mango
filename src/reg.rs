@@ -194,6 +194,7 @@ impl Reg {
             Reg::BPL | Reg::BP | Reg::EBP | Reg::RBP => BasePointer::from_opsize(op_size),
             Reg::SIL | Reg::SI | Reg::ESI | Reg::RSI => Source::from_opsize(op_size),
             Reg::DIL | Reg::DI | Reg::EDI | Reg::RDI => Destination::from_opsize(op_size),
+            // Need to handle the extra 8 registers added by intel for 64-bit mode
             _ => todo!(),
         }
     }

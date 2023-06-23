@@ -1,11 +1,11 @@
 use crate::{
-    opcode::{Operand, Opcode, OpcodeType, OpcodeError, OperandEncoding, OpSize, RegFieldExt, RegFieldExtError},
+    opcode::{AddrSize, Operand, Opcode, OpcodeType, OpcodeError, OperandEncoding, OpSize, RegFieldExt, RegFieldExtError},
     prefix::Prefix,
     rex::Rex,
     reg::Reg,
     reader::{Reader, ReaderError},
-    modrm::{Arch, ModRM, Sib, Sib32, Sib64},
-    imm::{Displacement, DispError, Immediate, ImmError},
+    modrm::{EffAddrType, Arch, ModRM, Sib, Sib32, Sib64},
+    imm::{DispArch, Displacement, DispError, Immediate, ImmError},
 };
 
 #[derive(Debug)]
@@ -36,13 +36,14 @@ pub struct Instruction {
     imm: Option<Immediate>,
     // After gathering all the required information about parsing the instruction, we need to
     // resolve to the actual operands of the instruction
-    operands: Vec<ResolvedOperand>,
+    operands: [Option<ResolvedOperand>; 4],
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ResolvedOperand {
     Immediate(Immediate),
     Reg(Reg),
+    Mem((EffAddrType, Option<Sib>, Option<Displacement>)),
     ToBeDecided,
 }
 
@@ -62,7 +63,7 @@ impl Instruction {
         };
 
         // Try and parse the byte as an Opcode
-        let first_opcode = Opcode::from_reader(reader)?;
+        let first_opcode = Opcode::from_reader_with_arch(reader, cpu_mode)?;
 
         // Based on wheather we have a prefix or not, we read the second opcode.
         let second_opcode = match first_opcode.ident {
@@ -70,7 +71,7 @@ impl Instruction {
             // prefix
             OpcodeType::Prefix(op_prefix) => {
                 maybe_prefix = Some(op_prefix);
-                Opcode::with_prefix(reader, op_prefix)?
+                Opcode::with_prefix_arch(reader, op_prefix, cpu_mode)?
             }
             _ => first_opcode
         };
@@ -86,8 +87,8 @@ impl Instruction {
                 // At this point we need to take into acount if we do have a prefix or not. This is
                 // because the prefix can change the opcode and the instruction
                 match maybe_prefix {
-                    Some(prefix) => Opcode::with_prefix(reader, prefix)?, 
-                    None => Opcode::from_reader(reader)?,
+                    Some(prefix) => Opcode::with_prefix_arch(reader, prefix, cpu_mode)?, 
+                    None => Opcode::from_reader_with_arch(reader, cpu_mode)?,
                 }
             }
             _ => second_opcode,
@@ -105,7 +106,7 @@ impl Instruction {
             // Get the reg part from the ModRM byte
             let reg = (modrm_byte >> 3) & 0b111;
 
-            third_opcode.convert_with_ext(RegFieldExt::try_from(reg)?)?;
+            third_opcode.convert_with_ext_arch(RegFieldExt::try_from(reg)?, cpu_mode)?;
         }
 
         let modrm_encodings = [
@@ -129,7 +130,7 @@ impl Instruction {
                 let modrm_byte = reader.read::<u8>()?;
 
                 // Parse the ModRM byte
-                let modrm = ModRM::from_byte_with_arch(modrm_byte, maybe_arch, maybe_rex);
+                let mut modrm = ModRM::from_byte_with_arch(modrm_byte, maybe_arch, maybe_rex);
 
                 // Based on the addressing mode of the CPU, we have to/or not read the SIB byte
                 if let Some(arch) = maybe_arch {
@@ -139,13 +140,29 @@ impl Instruction {
                         Arch::Arch32 => {
                             if modrm.1.has_sib() {
                                 let sib_byte = reader.read::<u8>()?;
-                                maybe_sib = Some(Sib::Sib32(Sib32::from(sib_byte)));
+                                let mut sib = Sib::Sib32(Sib32::from(sib_byte));
+                                // We know that we have a SIB, so we must take care now of how we
+                                // compute the effective address
+                                if modrm.1.mod_bits() == 0b00 {
+                                    sib.set_base(None);
+                                    modrm.1.set_displacement(Some(DispArch::Bit32));
+                                }
+                                
+                                maybe_sib = Some(sib);
                             }
                         }
                         Arch::Arch64 => {
                             if modrm.1.has_sib() {
                                 let sib_byte = reader.read::<u8>()?;
-                                maybe_sib = Some(Sib::Sib64(Sib64::from_byte_with_rex(sib_byte, maybe_rex)));
+                                let mut sib = Sib::Sib64(Sib64::from_byte_with_rex(sib_byte, maybe_rex));
+                                // We know that we have a SIB, so we must take care now of how we
+                                // compute the effective address
+                                if modrm.1.mod_bits() == 0b00 {
+                                    sib.set_base(None);
+                                    modrm.1.set_displacement(Some(DispArch::Bit32));
+                                }
+                                
+                                maybe_sib = Some(sib);
                             }
                         }
                         _ => maybe_sib = None,
@@ -155,6 +172,8 @@ impl Instruction {
                 if let Some(disp_arch) = modrm.1.displacement() {
                     let displacement = disp_arch.read(reader)?;
                     maybe_disp = Some(displacement);
+                } else {
+
                 }
 
                 maybe_modrm = Some(modrm);
@@ -164,26 +183,43 @@ impl Instruction {
         // Initialize the immediate value
         let mut maybe_imm = None;
 
-        // Construct an iterator over all the initialized operands
-        let op_iter = third_opcode.operands.iter().filter(|op| op.is_some()).map(|op| op.as_ref().unwrap());
-
         // Search if there are any immediates in the operands
-        let resolved_operands = op_iter.map(|op| {
+        let mut resolved_operands = [None; 4];
+
+        for (idx, op) in third_opcode.operands.iter().enumerate() {
+            // We just ignore operands which are `None`
+            if op.is_none() {
+                continue;
+            }
             // We need to take into consideration the Operand Size override prefix, when resolving
             // the operands. This switches the size of the operand depending on the CPU mode and
             // also the REX prefix
             let mut op_size_override = OpSize::from(cpu_mode);
 
-            if let Some(Prefix::OpSize) = maybe_prefix {
-                op_size_override = match cpu_mode {
-                    // If we are in 16-bit mode, we use 32-bit operand size
-                    Arch::Arch16 => OpSize::U32,
-                    // If we are in 32-bit mode, we use 16-bit operand size 
-                    Arch::Arch32 => OpSize::U16,
-                    // If we are in 64-bit mode, we use 16-bit operand size, however, the prefix
-                    // is ignored if there is a REX prefix with the field REX.X = 1 set.
-                    Arch::Arch64 => OpSize::U16,
+            // We also need to take into consideration the AddressSize override prefix, when
+            // resolving operands which refer to memory.
+            let mut addr_size_override = AddrSize::from(cpu_mode);
+
+            match maybe_prefix {
+                Some(Prefix::OpSize) => { 
+                    op_size_override = match cpu_mode {
+                        // If we are in 16-bit mode, we use 32-bit operand size
+                        Arch::Arch16 => OpSize::U32,
+                        // If we are in 32-bit mode, we use 16-bit operand size 
+                        Arch::Arch32 => OpSize::U16,
+                        // If we are in 64-bit mode, we use 16-bit operand size, however, the prefix
+                        // is ignored if there is a REX prefix with the field REX.X = 1 set.
+                        Arch::Arch64 => OpSize::U16,
+                    }
                 }
+                Some(Prefix::AddrSize) => { 
+                    addr_size_override = match cpu_mode {
+                        // If we are in 16-bit mode, we use 32-bit operand size
+                        Arch::Arch32 | Arch::Arch64 => AddrSize::Addr32Bit,
+                        _ => panic!("Instruction is illegal with the prefix"),
+                    }
+                }
+                _ => {}
             };
 
             // If we have a prefix, with the REX.X = 1 field set, the operand override prefix is
@@ -194,27 +230,71 @@ impl Instruction {
                 }
             }
 
-            let overridable_op_size = [OpSize::U16, OpSize::U32, OpSize::U64];
+            let overridable_op_size = [OpSize::CpuMode, OpSize::U16, OpSize::U32, OpSize::U64];
+            let overridable_addr_size = [AddrSize::Addr64Bit];
 
             match op {
-                Operand::Immediate(op_size) => {
+                Some(Operand::Immediate(op_size)) => {
                     let imm = match overridable_op_size.contains(op_size) { 
-                        true => Immediate::parse(&op_size_override, reader).expect("Cannot parse immediate"),
-                        false => Immediate::parse(op_size, reader).expect("Cannot parse immediate"),
+                        true => Immediate::parse(&op_size_override, reader)?,
+                        false => Immediate::parse(op_size, reader)?,
                     };
-                    ResolvedOperand::Immediate(imm)
+                    resolved_operands[idx] = Some(ResolvedOperand::Immediate(imm));
                 }
-                Operand::RegFamily(family) => {
+                Some(Operand::RegFamily(family)) => {
                     let reg = family.reg_from(&op_size_override);
-                    ResolvedOperand::Reg(reg)
+                    resolved_operands[idx] = Some(ResolvedOperand::Reg(reg));
                 }
-                Operand::Reg(reg) => ResolvedOperand::Reg(*reg),
+                Some(Operand::Reg(reg)) => resolved_operands[idx] = Some(ResolvedOperand::Reg(*reg)),
                 // We need to convert the RM field from ModRM into the correct register, based on
                 // operand size
-                Operand::ModRM(op_size) => ResolvedOperand::ToBeDecided,
-                _ => ResolvedOperand::ToBeDecided,
-            }
-        }).collect::<Vec<_>>();
+                Some(Operand::ModRMReg(op_size)) => {
+                    let modrm = maybe_modrm.as_ref().ok_or(InstructionError::InvalidModRMError)?;
+                    let reg = modrm.rm_reg().ok_or(InstructionError::InvalidModRMError)?;
+                    let reg = match overridable_op_size.contains(op_size) { 
+                        true => reg.convert_with_opsize(&op_size_override),
+                        false => reg.convert_with_opsize(op_size),
+                    };
+                    resolved_operands[idx] = Some(ResolvedOperand::Reg(reg));
+                }
+                Some(Operand::ModRMMem(op_size, addr_size)) => {
+                    let modrm = maybe_modrm.as_ref().ok_or(InstructionError::InvalidModRMError)?;
+                    let mem = modrm.rm_mem();
+                    let mem = match overridable_addr_size.contains(addr_size) { 
+                        true => {
+                            let eff_addr = mem.convert_with_addrsize(addr_size_override);
+                            let sib = if let Some(inner_sib) = maybe_sib {
+                                Some(inner_sib.convert_with_addrsize(addr_size_override))
+                            } else {
+                                None
+                            };
+                            (eff_addr, sib, maybe_disp)
+                        }
+                        false => {
+                            let eff_addr = mem.convert_with_addrsize(*addr_size);
+                            let sib = if let Some(inner_sib) = maybe_sib {
+                                Some(inner_sib.convert_with_addrsize(*addr_size))
+                            } else {
+                                None
+                            };
+                            (eff_addr, sib, maybe_disp)
+                        }
+                    };
+
+                    resolved_operands[idx] = Some(ResolvedOperand::Mem(mem));
+                }
+                Some(Operand::ModReg(op_size)) => {
+                    let modrm = maybe_modrm.as_ref().ok_or(InstructionError::InvalidModRMError)?;
+                    let reg = modrm.reg();
+                    let reg = match overridable_op_size.contains(&op_size) { 
+                        true => reg.convert_with_opsize(&op_size_override),
+                        false => reg.convert_with_opsize(&op_size),
+                    };
+                    resolved_operands[idx] = Some(ResolvedOperand::Reg(reg));
+                }
+                _ => resolved_operands[idx] = Some(ResolvedOperand::ToBeDecided),
+            };
+        }
  
         Ok(Instruction {
             prefix: maybe_prefix,
@@ -237,6 +317,7 @@ pub enum InstructionError {
     RegFieldExtError(RegFieldExtError),
     DispError(DispError),
     ImmError(ImmError),
+    InvalidModRMError,
 }
 
 impl From<OpcodeError> for InstructionError {

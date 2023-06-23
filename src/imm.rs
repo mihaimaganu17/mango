@@ -8,7 +8,7 @@ use crate::{opcode::OpSize, reader::{Reader, ReaderError}};
 /// - [reg * constant + displacement]
 /// Some addressing forms include a displacement immediately following the ModR/M byte (or the SIB
 /// byte if one is present). If a displacement is required, it can be 1, 2, or 4 bytes.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Displacement {
     Disp8(u8),
     Disp16(u16),
@@ -51,7 +51,7 @@ impl From<ReaderError> for DispError {
 
 /// If an instruction specifies an immediate operand, the operand always follows any displacement
 /// bytes. An immediate operand can be 1, 2 or 4 bytes
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Immediate {
     ImmU8(u8),
     ImmU16(u16),
