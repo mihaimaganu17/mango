@@ -2,6 +2,7 @@
 
 /// Represents instruction prefixes of 1 byte each. They are divided into four groups, each
 /// with a set of allowable prefix codes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Prefix {
     // Lock, repeat and BND prefixes
     Group1(Group1),
@@ -13,12 +14,40 @@ pub enum Prefix {
     AddrSize,
 }
 
+impl Prefix {
+    /// Takes one bytes, specified by `value` and tries to see if it is a prefix
+    pub fn from_byte(value: u8) -> Option<Self> {
+        // We are basically testing, iteratively, the `value` against all prefix types
+        // The order of the tested prefix types below is not important and does not matter.
+
+        // We first try and see, if we have a Group1 prefix
+        if let Ok(temp_prefix) = Group1::try_from(value) {
+            return Some(Self::Group1(temp_prefix))
+        }
+
+        // Second, if we have a Group2 prefix
+        if let Ok(temp_prefix) = Group2::try_from(value) {
+            return Some(Self::Group2(temp_prefix))
+        }
+
+        // Next, we check for overrides
+        match value {
+            // Operand size override
+            prefix_code::OP_SIZE_OVERRIDE => Some(Self::OpSize),
+            // Address size override
+            prefix_code::ADDR_SIZE_OVERRIDE => Some(Self::AddrSize),
+            // Any other value, does not represent a prefix
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum PrefixError {
     InvalidPrefix,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Group1 {
     // Forces an operation that ensures exclusive use of shared memory in a multiprocessor
     // environment.
@@ -39,15 +68,12 @@ impl TryFrom<u8> for Group1 {
             prefix_code::LOCK => Ok(Self::Lock),
             prefix_code::REPNE => Ok(Self::RepNE),
             prefix_code::REP => Ok(Self::Rep),
-            prefix_code::LOCK => Ok(Self::Lock),
-            prefix_code::REPNE => Ok(Self::RepNE),
-            prefix_code::REP => Ok(Self::Rep),
             _ => Err(PrefixError::InvalidPrefix),
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Group2 {
     // CS Segment override(used with any branch instruction) or
     // Branch not taken(on older microarchitectures, used only with Jcc instructions)

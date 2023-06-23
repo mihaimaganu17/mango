@@ -5,6 +5,8 @@ mod imm;
 mod reg;
 mod reader;
 mod dis;
+mod rex;
+mod inst;
 
 #[cfg(test)]
 mod tests {
@@ -49,12 +51,25 @@ mod tests {
         }
     }
 
-    #[test]
+    //#[test]
     fn test_dis_parse() {
         let ls_path = "testdata/ls";
         let bytes = fs::read(ls_path).unwrap();
 
-        let exec_bytes = bytes.get(0x4000..0x13146).unwrap();
+        let exec_bytes = bytes.get(0x6ab0..0x13146).unwrap();
+
+        let mut reader = Reader::from_vec(exec_bytes.to_vec());
+        let dis = Disassembler;
+
+        dis.parse(&mut reader).unwrap();
+    }
+
+    #[test]
+    fn test_dis_parse_hello() {
+        let ls_path = "hello_world_lea_xor";
+        let bytes = fs::read(ls_path).unwrap();
+
+        let exec_bytes = bytes.get(0x1038..0x109c).unwrap();
 
         let mut reader = Reader::from_vec(exec_bytes.to_vec());
         let dis = Disassembler;

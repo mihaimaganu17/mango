@@ -20,7 +20,8 @@
 /// INC/DEC functionality is still available using ModR/M forms of the same instructions
 /// (opcodes FF/0 and FF/1)
 /// The bits in position [4:8] are always 0100
-pub struct REX {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Rex {
     // This value represents a single bit, with the following values:
     // - 0: Operand size determined by CS.d(either 16-bit or 32-bit).
     // - 1: 64-bit Operand size
@@ -41,4 +42,36 @@ pub struct REX {
     b: u8,
 }
 
+impl Rex {
+    pub fn from_byte(value: u8) -> Option<Rex> {
+        match value {
+            // This is the span of the REX prefixes as of March 2023 Intel Manual
+            0x40..=0x4F => {
+                // Fetch the needed prefix bits
+                let w = (value >> 3) & 1;
+                let r = (value >> 2) & 1;
+                let x = (value >> 1) & 1;
+                let b = value & 1;
 
+                Some(Rex { w, r, x, b})
+            }
+            _ => None,
+        }
+    }
+
+    pub fn b(&self) -> u8 {
+        self.b
+    }
+
+    pub fn x(&self) -> u8 {
+        self.x
+    }
+
+    pub fn r(&self) -> u8 {
+        self.r
+    }
+
+    pub fn w(&self) -> u8 {
+        self.w
+    }
+}
