@@ -163,6 +163,9 @@ impl Instruction {
                                 }
                                 
                                 maybe_sib = Some(sib);
+                            } else {
+                                // If we do not have a sib, then we must augment the `Reg` from
+                                // the ModRM byte with the REX.B value
                             }
                         }
                         _ => maybe_sib = None,
@@ -258,7 +261,7 @@ impl Instruction {
                     resolved_operands[idx] = Some(ResolvedOperand::Reg(reg));
                 }
                 Some(Operand::ModRMMem(op_size, addr_size)) => {
-                    let modrm = maybe_modrm.as_ref().ok_or(InstructionError::InvalidModRMError)?;
+                    let mut modrm = maybe_modrm.as_mut().ok_or(InstructionError::InvalidModRMError)?;
                     let mem = modrm.rm_mem();
                     let mem = match overridable_addr_size.contains(addr_size) { 
                         true => {
