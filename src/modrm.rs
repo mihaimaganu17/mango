@@ -21,36 +21,36 @@ pub struct ModRM(pub Reg, pub Addressing);
 
 impl ModRM {
     pub fn from_byte_with_arch(value: u8, maybe_arch: Option<Arch>, maybe_rex: Option<Rex>) -> Self {
+        let reg = (value >> 3) & 0b111;
+
         // We compute the addressing form, based on what we are passed
-        let addressing = match maybe_arch {
+        let (reg, addressing) = match maybe_arch {
             // If we have an architecture passed, we parse addressing based on that
             Some(arch) => {
                 match arch {
-                    Arch::Arch16 => Addressing::EffAddr16Bit(EffAddr16Bit::from(value)),
-                    Arch::Arch32 => Addressing::EffAddr32Bit(EffAddr32Bit::from(value)),
-                    Arch::Arch64 => Addressing::EffAddr64Bit(EffAddr64Bit::from_byte_with_rex(value, maybe_rex)),
+                    Arch::Arch16 => (reg, Addressing::EffAddr16Bit(EffAddr16Bit::from(value))),
+                    Arch::Arch32 => (reg, Addressing::EffAddr32Bit(EffAddr32Bit::from(value))),
+                    Arch::Arch64 => {
+                        let addr = Addressing::EffAddr64Bit(EffAddr64Bit::from_byte_with_rex(value, maybe_rex));
+
+                        let reg = match maybe_rex {
+                            Some(rex) =>
+                                // No matter the case, the `r` field of the Rex prefix, will always have to be
+                                // prepended to the Reg
+                                (rex.r() << 3) | reg,
+                            None => reg,
+                        };
+                        (reg, addr)
+                    }
                 }
             }
             // If not, the default is 32 Bits
-            None => Addressing::EffAddr32Bit(EffAddr32Bit::from(value)),
+            None => (reg, Addressing::EffAddr32Bit(EffAddr32Bit::from(value))),
         };
 
         // Get Mod
         let mod_addr = value >> 6 & 0b11;
 
-        let reg = (value >> 3) & 0b111;
-
-        // If the mod we are using is just register to register addressing, with no memory operand,
-        // we need to prefix the `reg` field as well.
-        let reg = match mod_addr {
-            0b11 => {
-                match maybe_rex {
-                    Some(rex) => (rex.r() << 3) | reg,
-                    None => reg,
-                }
-            }
-            _ => reg
-        };
 
         Self(Reg::from_byte_with_arch(reg, maybe_arch), addressing)
     }
@@ -420,6 +420,7 @@ impl EffAddr64Bit {
     fn from_byte_with_rex(value: u8, maybe_rex: Option<Rex>) -> Self{
         // Get R/M
         let mut r_m = value & 0b111;
+
         // Since we may be using a REX, we have to extend the r/m byte to the desired register
         if let Some(rex) = maybe_rex {
             r_m = (rex.b() << 3) | r_m;
@@ -727,6 +728,8 @@ impl Sib64 {
             base = (rex.b() << 3) | base;
         }
 
+        println!("Base: {base:b}");
+
         let base = match base {
             0b0000 => Some(Reg::RAX),
             0b0001 => Some(Reg::RCX),
@@ -780,7 +783,7 @@ impl Sib64 {
                 0b1001 => (Some(Reg::R9), Some(Scale(2))),
                 0b1010 => (Some(Reg::R10), Some(Scale(2))),
                 0b1011 => (Some(Reg::R11), Some(Scale(2))),
-                0b1100 => (Some(Reg::R12), None),
+                0b1100 => (Some(Reg::R12), Some(Scale(2))),
                 0b1101 => (Some(Reg::R13), Some(Scale(2))),
                 0b1110 => (Some(Reg::R14), Some(Scale(2))),
                 0b1111 => (Some(Reg::R15), Some(Scale(2))),
@@ -799,7 +802,7 @@ impl Sib64 {
                 0b1001 => (Some(Reg::R9), Some(Scale(4))),
                 0b1010 => (Some(Reg::R10), Some(Scale(4))),
                 0b1011 => (Some(Reg::R11), Some(Scale(4))),
-                0b1100 => (Some(Reg::R12), None),
+                0b1100 => (Some(Reg::R12), Some(Scale(4))),
                 0b1101 => (Some(Reg::R13), Some(Scale(4))),
                 0b1110 => (Some(Reg::R14), Some(Scale(4))),
                 0b1111 => (Some(Reg::R15), Some(Scale(4))),
@@ -818,7 +821,7 @@ impl Sib64 {
                 0b1001 => (Some(Reg::R9), Some(Scale(8))),
                 0b1010 => (Some(Reg::R10), Some(Scale(8))),
                 0b1011 => (Some(Reg::R11), Some(Scale(8))),
-                0b1100 => (Some(Reg::R12), None),
+                0b1100 => (Some(Reg::R12), Some(Scale(8))),
                 0b1101 => (Some(Reg::R13), Some(Scale(8))),
                 0b1110 => (Some(Reg::R14), Some(Scale(8))),
                 0b1111 => (Some(Reg::R15), Some(Scale(8))),

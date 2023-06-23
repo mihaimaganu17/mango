@@ -58,6 +58,30 @@ pub enum Reg {
     R13,
     R14,
     R15,
+    R8b,
+    R9b,
+    R10b,
+    R11b,
+    R12b,
+    R13b,
+    R14b,
+    R15b,
+    R8w,
+    R9w,
+    R10w,
+    R11w,
+    R12w,
+    R13w,
+    R14w,
+    R15w,
+    R8d,
+    R9d,
+    R10d,
+    R11d,
+    R12d,
+    R13d,
+    R14d,
+    R15d,
     SIL,
     DIL,
     SPL,
@@ -79,7 +103,7 @@ impl RegFamily {
 
 pub trait Gpr {
     const Reg8BitLo: Reg;
-    const Reg8BitHi: Reg;
+    const Reg8BitHi: Option<Reg>;
     const Reg16Bit: Reg;
     const Reg32Bit: Reg;
     const Reg64Bit: Reg;
@@ -100,7 +124,7 @@ pub struct Accumulator;
 
 impl Gpr for Accumulator {
     const Reg8BitLo: Reg = Reg::AL;
-    const Reg8BitHi: Reg = Reg::AH;
+    const Reg8BitHi: Option<Reg> = Some(Reg::AH);
     const Reg16Bit: Reg = Reg::AX;
     const Reg32Bit: Reg = Reg::EAX;
     const Reg64Bit: Reg = Reg::RAX;
@@ -111,7 +135,7 @@ pub struct Counter;
 
 impl Gpr for Counter {
     const Reg8BitLo: Reg = Reg::CL;
-    const Reg8BitHi: Reg = Reg::CH;
+    const Reg8BitHi: Option<Reg> = Some(Reg::CH);
     const Reg16Bit: Reg = Reg::CX;
     const Reg32Bit: Reg = Reg::ECX;
     const Reg64Bit: Reg = Reg::RCX;
@@ -122,7 +146,7 @@ pub struct Data;
 
 impl Gpr for Data {
     const Reg8BitLo: Reg = Reg::DL;
-    const Reg8BitHi: Reg = Reg::DH;
+    const Reg8BitHi: Option<Reg> = Some(Reg::DH);
     const Reg16Bit: Reg = Reg::DX;
     const Reg32Bit: Reg = Reg::EDX;
     const Reg64Bit: Reg = Reg::RDX;
@@ -133,7 +157,7 @@ pub struct Base;
 
 impl Gpr for Base {
     const Reg8BitLo: Reg = Reg::BL;
-    const Reg8BitHi: Reg = Reg::BH;
+    const Reg8BitHi: Option<Reg> = Some(Reg::BH);
     const Reg16Bit: Reg = Reg::BX;
     const Reg32Bit: Reg = Reg::EBX;
     const Reg64Bit: Reg = Reg::RBX;
@@ -144,7 +168,7 @@ pub struct StackPointer;
 
 impl Gpr for StackPointer {
     const Reg8BitLo: Reg = Reg::SPL;
-    const Reg8BitHi: Reg = Reg::SP;
+    const Reg8BitHi: Option<Reg> = None;
     const Reg16Bit: Reg = Reg::SP;
     const Reg32Bit: Reg = Reg::ESP;
     const Reg64Bit: Reg = Reg::RSP;
@@ -155,7 +179,7 @@ pub struct BasePointer;
 
 impl Gpr for BasePointer {
     const Reg8BitLo: Reg = Reg::BPL;
-    const Reg8BitHi: Reg = Reg::BP;
+    const Reg8BitHi: Option<Reg> = None;
     const Reg16Bit: Reg = Reg::BP;
     const Reg32Bit: Reg = Reg::EBP;
     const Reg64Bit: Reg = Reg::RBP;
@@ -166,7 +190,7 @@ pub struct Source;
 
 impl Gpr for Source {
     const Reg8BitLo: Reg = Reg::SIL;
-    const Reg8BitHi: Reg = Reg::SI;
+    const Reg8BitHi: Option<Reg> = None;
     const Reg16Bit: Reg = Reg::SI;
     const Reg32Bit: Reg = Reg::ESI;
     const Reg64Bit: Reg = Reg::RSI;
@@ -177,10 +201,98 @@ pub struct Destination;
 
 impl Gpr for Destination {
     const Reg8BitLo: Reg = Reg::DIL;
-    const Reg8BitHi: Reg = Reg::DI;
+    const Reg8BitHi: Option<Reg> = None;
     const Reg16Bit: Reg = Reg::DI;
     const Reg32Bit: Reg = Reg::EDI;
     const Reg64Bit: Reg = Reg::RDI;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct R8Reg;
+
+impl Gpr for R8Reg {
+    const Reg8BitLo: Reg = Reg::R8b;
+    const Reg8BitHi: Option<Reg> = None;
+    const Reg16Bit: Reg = Reg::R8w;
+    const Reg32Bit: Reg = Reg::R8d;
+    const Reg64Bit: Reg = Reg::R8;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct R9Reg;
+
+impl Gpr for R9Reg {
+    const Reg8BitLo: Reg = Reg::R9b;
+    const Reg8BitHi: Option<Reg> = None;
+    const Reg16Bit: Reg = Reg::R9w;
+    const Reg32Bit: Reg = Reg::R9d;
+    const Reg64Bit: Reg = Reg::R9;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct R10Reg;
+
+impl Gpr for R10Reg {
+    const Reg8BitLo: Reg = Reg::R10b;
+    const Reg8BitHi: Option<Reg> = None;
+    const Reg16Bit: Reg = Reg::R10w;
+    const Reg32Bit: Reg = Reg::R10d;
+    const Reg64Bit: Reg = Reg::R10;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct R11Reg;
+
+impl Gpr for R11Reg {
+    const Reg8BitLo: Reg = Reg::R11b;
+    const Reg8BitHi: Option<Reg> = None;
+    const Reg16Bit: Reg = Reg::R11w;
+    const Reg32Bit: Reg = Reg::R11d;
+    const Reg64Bit: Reg = Reg::R11;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct R12Reg;
+
+impl Gpr for R12Reg {
+    const Reg8BitLo: Reg = Reg::R12b;
+    const Reg8BitHi: Option<Reg> = None;
+    const Reg16Bit: Reg = Reg::R12w;
+    const Reg32Bit: Reg = Reg::R12d;
+    const Reg64Bit: Reg = Reg::R12;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct R13Reg;
+
+impl Gpr for R13Reg {
+    const Reg8BitLo: Reg = Reg::R13b;
+    const Reg8BitHi: Option<Reg> = None;
+    const Reg16Bit: Reg = Reg::R13w;
+    const Reg32Bit: Reg = Reg::R13d;
+    const Reg64Bit: Reg = Reg::R13;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct R14Reg;
+
+impl Gpr for R14Reg {
+    const Reg8BitLo: Reg = Reg::R14b;
+    const Reg8BitHi: Option<Reg> = None;
+    const Reg16Bit: Reg = Reg::R14w;
+    const Reg32Bit: Reg = Reg::R14d;
+    const Reg64Bit: Reg = Reg::R14;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct R15Reg;
+
+impl Gpr for R15Reg {
+    const Reg8BitLo: Reg = Reg::R15b;
+    const Reg8BitHi: Option<Reg> = None;
+    const Reg16Bit: Reg = Reg::R15w;
+    const Reg32Bit: Reg = Reg::R15d;
+    const Reg64Bit: Reg = Reg::R15;
 }
 
 impl Reg {
@@ -194,8 +306,17 @@ impl Reg {
             Reg::BPL | Reg::BP | Reg::EBP | Reg::RBP => BasePointer::from_opsize(op_size),
             Reg::SIL | Reg::SI | Reg::ESI | Reg::RSI => Source::from_opsize(op_size),
             Reg::DIL | Reg::DI | Reg::EDI | Reg::RDI => Destination::from_opsize(op_size),
-            // Need to handle the extra 8 registers added by intel for 64-bit mode
-            _ => todo!(),
+            Reg::R8b | Reg::R8w | Reg::R8d | Reg::R8 => R8Reg::from_opsize(op_size),
+            Reg::R9b | Reg::R9w | Reg::R9d | Reg::R9 => R9Reg::from_opsize(op_size),
+            Reg::R10b | Reg::R10w | Reg::R10d | Reg::R10 => R10Reg::from_opsize(op_size),
+            Reg::R11b | Reg::R8w | Reg::R8d | Reg::R8 => R8Reg::from_opsize(op_size),
+            Reg::R12b | Reg::R12w | Reg::R12d | Reg::R12 => R12Reg::from_opsize(op_size),
+            Reg::R13b | Reg::R13w | Reg::R13d | Reg::R13 => R13Reg::from_opsize(op_size),
+            Reg::R14b | Reg::R14w | Reg::R14d | Reg::R14 => R14Reg::from_opsize(op_size),
+            Reg::R15b | Reg::R15w | Reg::R15d | Reg::R15 => R15Reg::from_opsize(op_size),
+            // There are only control and special registers left, which should be put in a
+            // different category
+            _ => unreachable!(),
         }
     }
     // Convert the value to a register, specified by r/m16
