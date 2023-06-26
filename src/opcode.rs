@@ -188,6 +188,8 @@ pub enum Operand {
     Opcode(OpSize),
     // There is an Immediate integer following the opcode that represents the operand
     Immediate(OpSize),
+    // There is a Signed Immediate integer following the opcode that represents the operand
+    SignedImmediate(OpSize),
     // The operand is a specific register or a set of registers
     Reg(Reg),
     // The operand is a family of registers and reffers to General Purpose Registers
@@ -219,6 +221,7 @@ impl Operand {
 pub enum OpcodeError {
     ReaderError(ReaderError),
     InvalidPrefix(Prefix),
+    InexistentPrefix,
     Invalid3ByteOpcode(u8, u8, u8),
 }
 
@@ -270,6 +273,73 @@ impl Opcode {
         // It is the job of this match to make sure we propagate the information upwards, that the
         // calling function needs, in order to parse the rest of the bytes
         match byte {
+            // ADD opcodes
+            0x00 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::from_map(AddressingMethod::E, OperandType::B, arch));
+                operands[1] = Some(Operand::from_map(AddressingMethod::G, OperandType::B, arch));
+                let encoding = Some(OperandEncoding::MR);
+                Ok(Opcode {
+                    ident: OpcodeType::Add,
+                    operands,
+                    encoding,
+                })
+            }
+            0x01 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::from_map(AddressingMethod::E, OperandType::V, arch));
+                operands[1] = Some(Operand::from_map(AddressingMethod::G, OperandType::V, arch));
+                let encoding = Some(OperandEncoding::MR);
+                Ok(Opcode {
+                    ident: OpcodeType::Add,
+                    operands,
+                    encoding,
+                })
+            }
+            0x02 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::from_map(AddressingMethod::G, OperandType::B, arch));
+                operands[1] = Some(Operand::from_map(AddressingMethod::E, OperandType::B, arch));
+                let encoding = Some(OperandEncoding::RM);
+                Ok(Opcode {
+                    ident: OpcodeType::Add,
+                    operands,
+                    encoding,
+                })
+            }
+            0x03 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::from_map(AddressingMethod::G, OperandType::V, arch));
+                operands[1] = Some(Operand::from_map(AddressingMethod::E, OperandType::V, arch));
+                let encoding = Some(OperandEncoding::RM);
+                Ok(Opcode {
+                    ident: OpcodeType::Add,
+                    operands,
+                    encoding,
+                })
+            }
+            0x04 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::Reg(Reg::AL));
+                operands[1] = Some(Operand::from_map(AddressingMethod::I, OperandType::B, arch));
+                let encoding = Some(OperandEncoding::I);
+                Ok(Opcode {
+                    ident: OpcodeType::Add,
+                    operands,
+                    encoding,
+                })
+            }
+            0x05 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::RegFamily(RegFamily::Accumulator));
+                operands[1] = Some(Operand::from_map(AddressingMethod::I, OperandType::Z, arch));
+                let encoding = Some(OperandEncoding::I);
+                Ok(Opcode {
+                    ident: OpcodeType::Add,
+                    operands,
+                    encoding,
+                })
+            }
             // XOR opcodes
             0x30 => {
                 let mut operands = [None, None, None, None];
@@ -297,12 +367,8 @@ impl Opcode {
                 operands: [Some(Operand::RegFamily(RegFamily::Accumulator)), Some(Operand::Immediate(OpSize::U32)), None, None],
                 encoding: Some(OperandEncoding::I),
             }),
-            0x80 => Ok(Opcode {
-                ident: OpcodeType::NeedsModRMExtension(byte),
-                operands: [None, None, None, None],
-                encoding: None,
-            }),
-            0x81 => Ok(Opcode {
+            // Immediate Group 1, which needs extension from ModRM in order to get the opcode
+            0x80 | 0x81 | 0x82 | 0x83 => Ok(Opcode {
                 ident: OpcodeType::NeedsModRMExtension(byte),
                 operands: [None, None, None, None],
                 encoding: None,
@@ -336,6 +402,16 @@ impl Opcode {
                         self.operands[1] = Some(Operand::from_map(AddressingMethod::I, OperandType::Z, arch));
                         self.encoding = Some(OperandEncoding::MI);
                     }
+                    0x82 => {
+                        self.operands[0] = Some(Operand::from_map(AddressingMethod::E, OperandType::B, arch));
+                        self.operands[1] = Some(Operand::from_map(AddressingMethod::I, OperandType::B, arch));
+                        self.encoding = Some(OperandEncoding::MI);
+                    }
+                    0x83 => {
+                        self.operands[0] = Some(Operand::from_map(AddressingMethod::E, OperandType::V, arch));
+                        self.operands[1] = Some(Operand::from_map(AddressingMethod::I, OperandType::B, arch));
+                        self.encoding = Some(OperandEncoding::MI);
+                    }
                     _ => {},
                 }
             }
@@ -360,7 +436,7 @@ impl Opcode {
     /// Special function that returns results based on the read prefix. This typically, and
     /// practically implies that the Opcode will be 2 or 3-bytes long.
     /// This function does not handle REX prefixes. It is the job of the caller to do that.
-    pub fn with_prefix_arch(reader: &mut Reader, prefix: Prefix, arch: Arch) -> Result<Self, OpcodeError> {
+    pub fn with_prefix_arch(reader: &mut Reader, prefixs: &[Prefix], arch: Arch) -> Result<Self, OpcodeError> {
         // Read the first byte from the `reader`
         let first_byte = reader.read::<u8>()?;
 
@@ -368,57 +444,63 @@ impl Opcode {
         match first_byte {
             // If we found an escape code, than we know that the Opcode is 2 or 3 bytes long
             opcode_prefix::ESCAPE_CODE => {
-                match prefix {
-                    Prefix::Group1(gr1) => {
-                        match gr1 {
-                            Group1::RepNE => Ok(Opcode {
-                                ident: OpcodeType::Unknown,
-                                operands: [None, None, None, None],
-                                encoding: None,
-                            }),
-                            Group1::Rep => {
-                                let second_byte = reader.read::<u8>()?;
-                                match second_byte {
-                                    // This is the byte that indicates an ENDBR
-                                    0x1E => {
-                                        // We have to read a 3rd byte
-                                        let third_byte = reader.read::<u8>()?;
-                                        match third_byte {
-                                            0xFB => Ok(Opcode {
-                                                ident: OpcodeType::EndBr32,
-                                                operands: [None, None, None, None],
-                                                encoding: Some(OperandEncoding::ZO),
-                                            }),
-                                            0xFA => Ok(Opcode {
-                                                ident: OpcodeType::EndBr64,
-                                                operands: [None, None, None, None],
-                                                encoding: Some(OperandEncoding::ZO),
-                                            }),
-                                            _ => Err(OpcodeError::Invalid3ByteOpcode(
-                                                    first_byte,
-                                                    second_byte,
-                                                    third_byte,
-                                                )),
-                                        }
-                                    }
-                                    _ => Ok(Opcode {
+                match prefixs.len() {
+                    0 => Err(OpcodeError::InexistentPrefix),
+                    _ => {
+                        let prefix = prefixs[0];
+                        match prefix {
+                            Prefix::Group1(gr1) => {
+                                match gr1 {
+                                    Group1::RepNE => Ok(Opcode {
                                         ident: OpcodeType::Unknown,
                                         operands: [None, None, None, None],
                                         encoding: None,
                                     }),
+                                    Group1::Rep => {
+                                        let second_byte = reader.read::<u8>()?;
+                                        match second_byte {
+                                            // This is the byte that indicates an ENDBR
+                                            0x1E => {
+                                                // We have to read a 3rd byte
+                                                let third_byte = reader.read::<u8>()?;
+                                                match third_byte {
+                                                    0xFB => Ok(Opcode {
+                                                        ident: OpcodeType::EndBr32,
+                                                        operands: [None, None, None, None],
+                                                        encoding: Some(OperandEncoding::ZO),
+                                                    }),
+                                                    0xFA => Ok(Opcode {
+                                                        ident: OpcodeType::EndBr64,
+                                                        operands: [None, None, None, None],
+                                                        encoding: Some(OperandEncoding::ZO),
+                                                    }),
+                                                    _ => Err(OpcodeError::Invalid3ByteOpcode(
+                                                            first_byte,
+                                                            second_byte,
+                                                            third_byte,
+                                                        )),
+                                                }
+                                            }
+                                            _ => Ok(Opcode {
+                                                ident: OpcodeType::Unknown,
+                                                operands: [None, None, None, None],
+                                                encoding: None,
+                                            }),
+                                        }
+                                    }
+                                    _ => Err(OpcodeError::InvalidPrefix(prefix)),
                                 }
                             }
+                            Prefix::OpSize => Ok(Opcode {
+                                ident: OpcodeType::Unknown,
+                                operands: [None, None, None, None],
+                                encoding: None,
+                            }),
+                            // If we have an escape code, any other prefix is invalid for a 2-byte, 3-byte
+                            // opcode
                             _ => Err(OpcodeError::InvalidPrefix(prefix)),
                         }
                     }
-                    Prefix::OpSize => Ok(Opcode {
-                        ident: OpcodeType::Unknown,
-                        operands: [None, None, None, None],
-                        encoding: None,
-                    }),
-                    // If we have an escape code, any other prefix is invalid for a 2-byte, 3-byte
-                    // opcode
-                    _ => Err(OpcodeError::InvalidPrefix(prefix)),
                 }
             }
             // If the byte is not an escape code, that means it is just a 1-byte

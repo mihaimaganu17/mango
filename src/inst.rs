@@ -12,7 +12,7 @@ use crate::{
 pub struct Instruction {
     // Optional prefix that can alter the instruction behaviour or can be specified to give a
     // different instruction.
-    prefix: Option<Prefix>,
+    prefixs: Vec<Prefix>,
     // Optional REX prefix, used to specify that the instruction needs and can be used in 64-bit
     // mode
     rex: Option<Rex>,
@@ -53,7 +53,7 @@ impl Instruction {
         maybe_arch: Option<Arch>,
     ) -> Result<Self, InstructionError> {
         // We assume that there is no prefix
-        let mut maybe_prefix = None;
+        let mut prefixs = vec![];
         // We also assume that there is not REX prefix
         let mut maybe_rex = None;
         // Declare the default CPU mode
@@ -63,15 +63,25 @@ impl Instruction {
         };
 
         // Try and parse the byte as an Opcode
-        let first_opcode = Opcode::from_reader_with_arch(reader, cpu_mode)?;
+        let mut first_opcode = Opcode::from_reader_with_arch(reader, cpu_mode)?;
+
+        let mut prefix_idx = 0;
+        while let OpcodeType::Prefix(op_prefix) = first_opcode.ident {
+            prefixs.push(op_prefix);
+            first_opcode = Opcode::with_prefix_arch(reader, &prefixs, cpu_mode)?;
+
+            if prefix_idx == 3 {
+                break;
+            }
+        }
 
         // Based on wheather we have a prefix or not, we read the second opcode.
         let second_opcode = match first_opcode.ident {
             // If we got a prefix, try and parse the next bytes, taking into acount that we have a
             // prefix
             OpcodeType::Prefix(op_prefix) => {
-                maybe_prefix = Some(op_prefix);
-                Opcode::with_prefix_arch(reader, op_prefix, cpu_mode)?
+                prefixs.push(op_prefix);
+                Opcode::with_prefix_arch(reader, &prefixs, cpu_mode)?
             }
             _ => first_opcode
         };
@@ -86,9 +96,9 @@ impl Instruction {
                  
                 // At this point we need to take into acount if we do have a prefix or not. This is
                 // because the prefix can change the opcode and the instruction
-                match maybe_prefix {
-                    Some(prefix) => Opcode::with_prefix_arch(reader, prefix, cpu_mode)?, 
-                    None => Opcode::from_reader_with_arch(reader, cpu_mode)?,
+                match prefixs.len() {
+                    0 => Opcode::from_reader_with_arch(reader, cpu_mode)?,
+                    _ => Opcode::with_prefix_arch(reader, &prefixs, cpu_mode)?, 
                 }
             }
             _ => second_opcode,
@@ -203,27 +213,24 @@ impl Instruction {
             // resolving operands which refer to memory.
             let mut addr_size_override = AddrSize::from(cpu_mode);
 
-            match maybe_prefix {
-                Some(Prefix::OpSize) => { 
-                    op_size_override = match cpu_mode {
-                        // If we are in 16-bit mode, we use 32-bit operand size
-                        Arch::Arch16 => OpSize::U32,
-                        // If we are in 32-bit mode, we use 16-bit operand size 
-                        Arch::Arch32 => OpSize::U16,
-                        // If we are in 64-bit mode, we use 16-bit operand size, however, the prefix
-                        // is ignored if there is a REX prefix with the field REX.X = 1 set.
-                        Arch::Arch64 => OpSize::U16,
-                    }
+            if prefixs.contains(&Prefix::OpSize) {
+                op_size_override = match cpu_mode {
+                    // If we are in 16-bit mode, we use 32-bit operand size
+                    Arch::Arch16 => OpSize::U32,
+                    // If we are in 32-bit mode, we use 16-bit operand size 
+                    Arch::Arch32 => OpSize::U16,
+                    // If we are in 64-bit mode, we use 16-bit operand size, however, the prefix
+                    // is ignored if there is a REX prefix with the field REX.X = 1 set.
+                    Arch::Arch64 => OpSize::U16,
                 }
-                Some(Prefix::AddrSize) => { 
-                    addr_size_override = match cpu_mode {
-                        // If we are in 16-bit mode, we use 32-bit operand size
-                        Arch::Arch32 | Arch::Arch64 => AddrSize::Addr32Bit,
-                        _ => panic!("Instruction is illegal with the prefix"),
-                    }
+            }
+            if prefixs.contains(&Prefix::AddrSize) { 
+                addr_size_override = match cpu_mode {
+                    // If we are in 16-bit mode, we use 32-bit operand size
+                    Arch::Arch32 | Arch::Arch64 => AddrSize::Addr32Bit,
+                    _ => panic!("Instruction is illegal with the prefix"),
                 }
-                _ => {}
-            };
+            }
 
             // If we have a prefix, with the REX.X = 1 field set, the operand override prefix is
             // ignored
@@ -235,6 +242,9 @@ impl Instruction {
 
             let overridable_op_size = [OpSize::CpuMode, OpSize::U16, OpSize::U32, OpSize::U64];
             let overridable_addr_size = [AddrSize::Addr64Bit];
+
+            println!("OPerand: {op:#?}");
+            println!("Prefix: {prefixs:#?}");
 
             match op {
                 Some(Operand::Immediate(op_size)) => {
@@ -300,7 +310,7 @@ impl Instruction {
         }
  
         Ok(Instruction {
-            prefix: maybe_prefix,
+            prefixs,
             rex: maybe_rex,
             opcode: third_opcode,
             modrm: maybe_modrm,

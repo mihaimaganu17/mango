@@ -50,7 +50,8 @@ impl From<ReaderError> for DispError {
 }
 
 /// If an instruction specifies an immediate operand, the operand always follows any displacement
-/// bytes. An immediate operand can be 1, 2 or 4 bytes
+/// bytes. An immediate operand can be 1, 2 or 4 bytes.
+/// Intel 0x86 Immediates are always sign-extended, so they are always signed.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Immediate {
     ImmU8(u8),
@@ -64,9 +65,9 @@ pub enum Immediate {
 impl Immediate {
     pub fn parse(op_size: &OpSize, reader: &mut Reader) -> Result<Self, ImmError> {
         match op_size {
-            OpSize::U8 => Ok(Immediate::ImmU8(reader.read::<u8>()?)),
-            OpSize::U16 => Ok(Immediate::ImmU16(reader.read::<u16>()?)),
-            OpSize::U32 => Ok(Immediate::ImmU32(reader.read::<u32>()?)),
+            OpSize::U8 => Ok(Immediate::ImmI8(reader.read::<i8>()?)),
+            OpSize::U16 => Ok(Immediate::ImmI16(reader.read::<i16>()?)),
+            OpSize::U32 => Ok(Immediate::ImmI32(reader.read::<i32>()?)),
             OpSize::U64 => Ok(Immediate::ImmI32(reader.read::<i32>()?)),
             OpSize::I8 => Ok(Immediate::ImmI8(reader.read::<i8>()?)),
             OpSize::I16 => Ok(Immediate::ImmI16(reader.read::<i16>()?)),

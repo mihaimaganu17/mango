@@ -147,35 +147,20 @@ impl Addressing {
     /// Returns the register of the R/M field(from ModRM) if it represents a register,
     /// otherwise `None`
     pub fn rm_reg(&self) -> Option<Reg> {
-        // Specify the mode, when the R/M field represents a register
-        let register_mode = 0b11;
-
         match self {
             Addressing::EffAddr16Bit(eff_addr_16bit) => {
-                if eff_addr_16bit.mod_addr == register_mode {
-                    return eff_addr_16bit.maybe_reg1;
-                } else {
-                    return None;
-                }
+                return eff_addr_16bit.maybe_reg1;
             }
             Addressing::EffAddr32Bit(eff_addr_32bit) => {
-                if eff_addr_32bit.mod_addr == register_mode {
-                    match eff_addr_32bit.eff_addr {
-                        EffAddrType::Reg(reg) => return Some(reg),
-                        _ => return None,
-                    }
-                } else {
-                    return None;
+                match eff_addr_32bit.eff_addr {
+                    EffAddrType::Reg(reg) => return Some(reg),
+                    _ => return None,
                 }
             }
             Addressing::EffAddr64Bit(eff_addr_64bit) => {
-                if eff_addr_64bit.mod_addr == register_mode {
-                    match eff_addr_64bit.eff_addr {
-                        EffAddrType::Reg(reg) => return Some(reg),
-                        _ => return None,
-                    }
-                } else {
-                    return None;
+                match eff_addr_64bit.eff_addr {
+                    EffAddrType::Reg(reg) => return Some(reg),
+                    _ => return None,
                 }
             }
         }
