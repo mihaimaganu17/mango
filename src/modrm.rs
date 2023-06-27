@@ -71,6 +71,10 @@ impl ModRM {
     pub fn reg(&self) -> Reg {
         self.0
     }
+
+    pub fn mod_bits(&self) -> u8 {
+        self.1.mod_bits()
+    }
 }
 
 #[derive(Debug)]
@@ -421,10 +425,10 @@ impl EffAddr64Bit {
             r_m = (rex.b() << 3) | r_m;
         }
 
-        println!("Value: {value:?}");
-
         // Get Mod
         let mod_addr = value >> 6 & 0b11;
+
+        println!("{mod_addr:?} ----- {r_m:?}");
 
         let eff_addr_64bit = match mod_addr {
             0b00 => {

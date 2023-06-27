@@ -36,7 +36,7 @@ pub struct Instruction {
     imm: Option<Immediate>,
     // After gathering all the required information about parsing the instruction, we need to
     // resolve to the actual operands of the instruction
-    operands: [Option<ResolvedOperand>; 4],
+    pub operands: [Option<ResolvedOperand>; 4],
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -196,8 +196,10 @@ impl Instruction {
                                 // We know that we have a SIB, so we must take care now of how we
                                 // compute the effective address
                                 if modrm.1.mod_bits() == 0b00 {
-                                    sib.set_base(None);
-                                    modrm.1.set_displacement(Some(DispArch::Bit32));
+                                    if let Some(Reg::RBP) = sib.base() {
+                                        sib.set_base(None);
+                                        modrm.1.set_displacement(Some(DispArch::Bit32));
+                                    }
                                 }
                                 
                                 maybe_sib = Some(sib);
@@ -271,9 +273,6 @@ impl Instruction {
             let overridable_op_size = [OpSize::CpuMode, OpSize::U16, OpSize::U32, OpSize::U64];
             let overridable_addr_size = [AddrSize::Addr64Bit];
 
-            println!("OPerand: {op:#?}");
-            println!("Prefix: {prefixs:#?}");
-
             match op {
                 Some(Operand::Immediate(op_size)) => {
                     let mut imm = match overridable_op_size.contains(op_size) { 
@@ -285,7 +284,6 @@ impl Instruction {
                     if idx > 0 {
                         if let Some(res_op) = resolved_operands[idx-1] {
                             let previous_op_size = res_op.size();
-                            println!("Res_op {previous_op_size:?}, imm {:?}", imm.size());
                             if previous_op_size > imm.size() {
                                 imm = imm.convert_with_opsize(previous_op_size);
                             }
@@ -298,42 +296,39 @@ impl Instruction {
                     resolved_operands[idx] = Some(ResolvedOperand::Reg(reg));
                 }
                 Some(Operand::Reg(reg)) => resolved_operands[idx] = Some(ResolvedOperand::Reg(*reg)),
-                // We need to convert the RM field from ModRM into the correct register, based on
-                // operand size
-                Some(Operand::ModRMReg(op_size)) => {
-                    let modrm = maybe_modrm.as_ref().ok_or(InstructionError::InvalidModRMError)?;
-                    let reg = modrm.rm_reg().ok_or(InstructionError::InvalidModRMError)?;
-                    let reg = match overridable_op_size.contains(op_size) { 
-                        true => reg.convert_with_opsize(&op_size_override),
-                        false => reg.convert_with_opsize(op_size),
-                    };
-                    resolved_operands[idx] = Some(ResolvedOperand::Reg(reg));
-                }
-                Some(Operand::ModRMMem(op_size, addr_size)) => {
+                Some(Operand::ModRM(op_size, addr_size)) => {
                     let mut modrm = maybe_modrm.as_mut().ok_or(InstructionError::InvalidModRMError)?;
-                    let mem = modrm.rm_mem();
-                    let mem = match overridable_addr_size.contains(addr_size) { 
-                        true => {
-                            let eff_addr = mem.convert_with_addrsize(addr_size_override);
-                            let sib = if let Some(inner_sib) = maybe_sib {
-                                Some(inner_sib.convert_with_addrsize(addr_size_override))
-                            } else {
-                                None
-                            };
-                            (eff_addr, sib, maybe_disp)
-                        }
-                        false => {
-                            let eff_addr = mem.convert_with_addrsize(*addr_size);
-                            let sib = if let Some(inner_sib) = maybe_sib {
-                                Some(inner_sib.convert_with_addrsize(*addr_size))
-                            } else {
-                                None
-                            };
-                            (eff_addr, sib, maybe_disp)
-                        }
-                    };
-
-                    resolved_operands[idx] = Some(ResolvedOperand::Mem(mem));
+                    if modrm.mod_bits() == 0b11 {
+                        let reg = modrm.rm_reg().ok_or(InstructionError::InvalidModRMError)?;
+                        let reg = match overridable_op_size.contains(op_size) { 
+                            true => reg.convert_with_opsize(&op_size_override),
+                            false => reg.convert_with_opsize(op_size),
+                        };
+                        resolved_operands[idx] = Some(ResolvedOperand::Reg(reg));
+                    } else {
+                        let mem = modrm.rm_mem();
+                        let mem = match overridable_addr_size.contains(addr_size) { 
+                            true => {
+                                let eff_addr = mem.convert_with_addrsize(addr_size_override);
+                                let sib = if let Some(inner_sib) = maybe_sib {
+                                    Some(inner_sib.convert_with_addrsize(addr_size_override))
+                                } else {
+                                    None
+                                };
+                                (eff_addr, sib, maybe_disp)
+                            }
+                            false => {
+                                let eff_addr = mem.convert_with_addrsize(*addr_size);
+                                let sib = if let Some(inner_sib) = maybe_sib {
+                                    Some(inner_sib.convert_with_addrsize(*addr_size))
+                                } else {
+                                    None
+                                };
+                                (eff_addr, sib, maybe_disp)
+                            }
+                        };
+                        resolved_operands[idx] = Some(ResolvedOperand::Mem(mem));
+                    }
                 }
                 Some(Operand::ModReg(op_size)) => {
                     let modrm = maybe_modrm.as_ref().ok_or(InstructionError::InvalidModRMError)?;

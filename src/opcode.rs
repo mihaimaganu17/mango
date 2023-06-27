@@ -179,10 +179,8 @@ pub struct OperandList(Operand, Operand, Operand, Operand);
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Operand {
-    // Represents a register operand found in the R/M field of ModR/M
-    ModRMMem(OpSize, AddrSize),
-    // Represents a memory operand found in the R/M field of ModR/M
-    ModRMReg(OpSize),
+    // Represents a register or a memory operand found in the R/M field of ModR/M
+    ModRM(OpSize, AddrSize),
     // Represents a register from the `reg` part of the ModRM field
     ModReg(OpSize),
     // The operand is embedded in the opcode
@@ -210,8 +208,8 @@ impl Operand {
         };
 
         match addr_meth {
-            AddressingMethod::E => Operand::ModRMReg(op_size),
-            AddressingMethod::M => Operand::ModRMMem(op_size, AddrSize::from(arch)),
+            AddressingMethod::E => Operand::ModRM(op_size, AddrSize::from(arch)),
+            AddressingMethod::M => Operand::ModRM(op_size, AddrSize::from(arch)),
             AddressingMethod::G => Operand::ModReg(op_size),
             AddressingMethod::I => Operand::Immediate(op_size),
         }
@@ -355,7 +353,7 @@ impl Opcode {
             }
             0x31 => Ok(Opcode {
                 ident: OpcodeType::Xor,
-                operands: [Some(Operand::ModRMReg(OpSize::CpuMode)), Some(Operand::ModReg(OpSize::CpuMode)), None, None],
+                operands: [Some(Operand::ModRM(OpSize::CpuMode, AddrSize::from(arch))), Some(Operand::ModReg(OpSize::CpuMode)), None, None],
                 encoding: Some(OperandEncoding::MR),
             }),
             0x34 => Ok(Opcode {
@@ -377,7 +375,7 @@ impl Opcode {
             // LEA
             0x8D => Ok(Opcode {
                 ident: OpcodeType::Lea,
-                operands: [Some(Operand::ModReg(OpSize::CpuMode)), Some(Operand::ModRMMem(OpSize::CpuMode, AddrSize::from(arch))), None, None],
+                operands: [Some(Operand::ModReg(OpSize::CpuMode)), Some(Operand::ModRM(OpSize::CpuMode, AddrSize::from(arch))), None, None],
                 encoding: Some(OperandEncoding::RM),
             }),
             _ => Ok(Opcode {

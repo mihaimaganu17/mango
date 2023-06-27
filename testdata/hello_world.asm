@@ -27,7 +27,7 @@ _start:
     add [ecx], eax
     add [r9], r10
     ; 0x02
-    add cl, [ecx*2]
+    add cl, [rax*2]
     ; 0x03
     add cx, [eax*8 + 0x09]
     add ecx, eax
