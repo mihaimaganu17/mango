@@ -4,6 +4,7 @@ use crate::imm::DispArch;
 use crate::reg::Reg;
 use crate::rex::Rex;
 use crate::opcode::{AddrSize, OpSize};
+use crate::inst::SizedOperand;
 
 /// Made up of three parts:
 /// - R/M, bits[0:3]
@@ -294,6 +295,15 @@ pub enum EffAddrType {
     None,
 }
 
+impl SizedOperand for EffAddrType {
+    fn size(&self) -> OpSize {
+        match self {
+            EffAddrType::Reg(reg) => reg.size(),
+            _ => OpSize::CpuMode,
+        }
+    }
+}
+
 impl EffAddrType {
     pub fn convert_with_addrsize(self, addr_size: AddrSize) -> Self {
         match self {
@@ -550,6 +560,15 @@ impl EffAddr64Bit {
 pub enum Sib {
     Sib32(Sib32),
     Sib64(Sib64),
+}
+
+impl SizedOperand for Sib {
+    fn size(&self) -> OpSize {
+        match self {
+            Sib::Sib32(_) => OpSize::U32, 
+            Sib::Sib64(_) => OpSize::U64, 
+        }
+    }
 }
 
 impl Sib {

@@ -47,6 +47,34 @@ pub enum ResolvedOperand {
     ToBeDecided,
 }
 
+pub trait SizedOperand {
+    fn size(&self) -> OpSize;
+}
+
+impl SizedOperand for ResolvedOperand {
+    fn size(&self) -> OpSize {
+        match self {
+            ResolvedOperand::Immediate(imm) => imm.size(),
+            ResolvedOperand::Reg(reg) => reg.size(),
+            ResolvedOperand::Mem((eff_addr, maybe_sib, _)) => {
+                let eff_addr_size = eff_addr.size();
+                match eff_addr_size {
+                    OpSize::CpuMode => {
+                        let sib_size = if let Some(sib) = maybe_sib {
+                            sib.size()
+                        } else {
+                            eff_addr_size
+                        };
+                        sib_size
+                    }
+                    _ => eff_addr_size,
+                }
+            }
+            _ => OpSize::CpuMode,
+        }
+    }
+}
+
 impl Instruction {
     pub fn from_reader(
         reader: &mut Reader,
@@ -197,7 +225,7 @@ impl Instruction {
         let mut maybe_imm = None;
 
         // Search if there are any immediates in the operands
-        let mut resolved_operands = [None; 4];
+        let mut resolved_operands: [Option<ResolvedOperand>; 4] = [None; 4];
 
         for (idx, op) in third_opcode.operands.iter().enumerate() {
             // We just ignore operands which are `None`
@@ -248,10 +276,21 @@ impl Instruction {
 
             match op {
                 Some(Operand::Immediate(op_size)) => {
-                    let imm = match overridable_op_size.contains(op_size) { 
+                    let mut imm = match overridable_op_size.contains(op_size) { 
                         true => Immediate::parse(&op_size_override, reader)?,
                         false => Immediate::parse(op_size, reader)?,
                     };
+                    // We check the size of the last operand, if it was smaller, we extend our
+                    // immediate
+                    if idx > 0 {
+                        if let Some(res_op) = resolved_operands[idx-1] {
+                            let previous_op_size = res_op.size();
+                            println!("Res_op {previous_op_size:?}, imm {:?}", imm.size());
+                            if previous_op_size > imm.size() {
+                                imm = imm.convert_with_opsize(previous_op_size);
+                            }
+                        }
+                    }
                     resolved_operands[idx] = Some(ResolvedOperand::Immediate(imm));
                 }
                 Some(Operand::RegFamily(family)) => {

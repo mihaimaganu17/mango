@@ -1,5 +1,5 @@
 //! Specifies the Displacement and Immediate rules and parsing mechanism
-use crate::{opcode::OpSize, reader::{Reader, ReaderError}};
+use crate::{opcode::OpSize, reader::{Reader, ReaderError}, inst::SizedOperand};
 
 /// The "displacement" is just a constant that gets added to the rest of the address. Examples
 /// include:
@@ -57,9 +57,26 @@ pub enum Immediate {
     ImmU8(u8),
     ImmU16(u16),
     ImmU32(u32),
+    ImmU64(u64),
     ImmI8(i8),
     ImmI16(i16),
     ImmI32(i32),
+    ImmI64(i64),
+}
+
+impl SizedOperand for Immediate {
+    fn size(&self) -> OpSize {
+        match self {
+            Immediate::ImmU8(value) => OpSize::U8, 
+            Immediate::ImmU16(value) => OpSize::U16, 
+            Immediate::ImmU32(value) => OpSize::U32, 
+            Immediate::ImmU64(value) => OpSize::U64, 
+            Immediate::ImmI8(value) => OpSize::I8, 
+            Immediate::ImmI16(value) => OpSize::I16, 
+            Immediate::ImmI32(value) => OpSize::I32, 
+            Immediate::ImmI64(value) => OpSize::I64, 
+        }
+    }
 }
 
 impl Immediate {
@@ -78,6 +95,40 @@ impl Immediate {
                 println!("OpSize: {op_size:?}");
                 todo!();
             }
+        }
+    }
+
+    pub fn convert_with_opsize(self, op_size: OpSize) -> Self {
+        match op_size {
+            OpSize::CpuMode | OpSize::U8 | OpSize::I8 => self,
+            OpSize::U16 | OpSize::I16 => {
+                match self {
+                    Immediate::ImmU8(value) => Immediate::ImmU16(value as u16),
+                    Immediate::ImmI8(value) => Immediate::ImmU16(value as u16),
+                    _ => self,
+                }
+            }
+            OpSize::U32 | OpSize::I32 => {
+                match self {
+                    Immediate::ImmU8(value) => Immediate::ImmU32(value as u32),
+                    Immediate::ImmI8(value) => Immediate::ImmU32(value as u32),
+                    Immediate::ImmU16(value) => Immediate::ImmU32(value as u32),
+                    Immediate::ImmI16(value) => Immediate::ImmU32(value as u32),
+                    _ => self,
+                }
+            }
+            OpSize::U64 | OpSize::I32 => {
+                match self {
+                    Immediate::ImmU8(value) => Immediate::ImmU64(value as u64),
+                    Immediate::ImmI8(value) => Immediate::ImmU64(value as u64),
+                    Immediate::ImmU16(value) => Immediate::ImmU64(value as u64),
+                    Immediate::ImmI16(value) => Immediate::ImmU64(value as u64),
+                    Immediate::ImmU32(value) => Immediate::ImmU64(value as u64),
+                    Immediate::ImmI32(value) => Immediate::ImmU64(value as u64),
+                    _ => self,
+                }
+            }
+            _ => self,
         }
     }
 }

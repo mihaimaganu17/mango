@@ -122,15 +122,16 @@ impl TryFrom<u8> for RegFieldExt {
 /// - The Opcode identifier itself.
 /// The current module, only controls the last one and the first 2 have to be addressed in the
 /// `Intruction` module
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+/// Pay attention to the variants as their order matter, since they derive the `PartialOrd` trait
+#[derive(Debug, PartialOrd, PartialEq, Eq, Clone, Copy)]
 pub enum OpSize {
     U8,
-    U16,
-    U32,
-    U64,
     I8,
+    U16,
     I16,
+    U32,
     I32,
+    U64,
     I64,
     CpuMode,
 }
