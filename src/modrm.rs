@@ -4,6 +4,7 @@ use crate::imm::DispArch;
 use crate::reg::Reg;
 use crate::rex::Rex;
 use crate::opcode::{AddrSize, OpSize};
+use crate::inst::SizedOperand;
 
 /// Made up of three parts:
 /// - R/M, bits[0:3]
@@ -69,6 +70,10 @@ impl ModRM {
 
     pub fn reg(&self) -> Reg {
         self.0
+    }
+
+    pub fn mod_bits(&self) -> u8 {
+        self.1.mod_bits()
     }
 }
 
@@ -147,35 +152,20 @@ impl Addressing {
     /// Returns the register of the R/M field(from ModRM) if it represents a register,
     /// otherwise `None`
     pub fn rm_reg(&self) -> Option<Reg> {
-        // Specify the mode, when the R/M field represents a register
-        let register_mode = 0b11;
-
         match self {
             Addressing::EffAddr16Bit(eff_addr_16bit) => {
-                if eff_addr_16bit.mod_addr == register_mode {
-                    return eff_addr_16bit.maybe_reg1;
-                } else {
-                    return None;
-                }
+                return eff_addr_16bit.maybe_reg1;
             }
             Addressing::EffAddr32Bit(eff_addr_32bit) => {
-                if eff_addr_32bit.mod_addr == register_mode {
-                    match eff_addr_32bit.eff_addr {
-                        EffAddrType::Reg(reg) => return Some(reg),
-                        _ => return None,
-                    }
-                } else {
-                    return None;
+                match eff_addr_32bit.eff_addr {
+                    EffAddrType::Reg(reg) => return Some(reg),
+                    _ => return None,
                 }
             }
             Addressing::EffAddr64Bit(eff_addr_64bit) => {
-                if eff_addr_64bit.mod_addr == register_mode {
-                    match eff_addr_64bit.eff_addr {
-                        EffAddrType::Reg(reg) => return Some(reg),
-                        _ => return None,
-                    }
-                } else {
-                    return None;
+                match eff_addr_64bit.eff_addr {
+                    EffAddrType::Reg(reg) => return Some(reg),
+                    _ => return None,
                 }
             }
         }
@@ -309,6 +299,15 @@ pub enum EffAddrType {
     None,
 }
 
+impl SizedOperand for EffAddrType {
+    fn size(&self) -> OpSize {
+        match self {
+            EffAddrType::Reg(reg) => reg.size(),
+            _ => OpSize::CpuMode,
+        }
+    }
+}
+
 impl EffAddrType {
     pub fn convert_with_addrsize(self, addr_size: AddrSize) -> Self {
         match self {
@@ -426,10 +425,10 @@ impl EffAddr64Bit {
             r_m = (rex.b() << 3) | r_m;
         }
 
-        println!("Value: {value:?}");
-
         // Get Mod
         let mod_addr = value >> 6 & 0b11;
+
+        println!("{mod_addr:?} ----- {r_m:?}");
 
         let eff_addr_64bit = match mod_addr {
             0b00 => {
@@ -565,6 +564,15 @@ impl EffAddr64Bit {
 pub enum Sib {
     Sib32(Sib32),
     Sib64(Sib64),
+}
+
+impl SizedOperand for Sib {
+    fn size(&self) -> OpSize {
+        match self {
+            Sib::Sib32(_) => OpSize::U32, 
+            Sib::Sib64(_) => OpSize::U64, 
+        }
+    }
 }
 
 impl Sib {

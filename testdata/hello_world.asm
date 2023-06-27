@@ -2,6 +2,37 @@ section .text
 global _start
 
 _start:
+    ; ADD instructions
+    ; 0x04
+    add al, 10
+    ; 0x05
+    add ax, 1700
+    add eax, 0xafebabe
+    add rax, 0xafebabe
+    ; 0x80
+    add cl, 9
+    add rcx, 80
+    ; 0x81
+    add dx, 110
+    add edx, 890
+    add r13, 0xabecafe
+    ; 0x83
+    add dx, -10
+    add edx, -10
+    add rcx, -10
+    ; 0x00
+    add cl, al
+    ; 0x01
+    add cx, ax
+    add [ecx], eax
+    add [r9], r10
+    ; 0x02
+    add cl, [rax*2]
+    ; 0x03
+    add cx, [eax*8 + 0x09]
+    add ecx, eax
+    add r10, [r9]
+    
     ; XOR instructions with a 0x35 prefix
     xor al, 0x1
     xor ax, 0x1000

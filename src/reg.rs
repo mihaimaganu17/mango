@@ -1,4 +1,4 @@
-use crate::{opcode::OpSize, modrm::Arch};
+use crate::{opcode::OpSize, modrm::Arch, inst::SizedOperand};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Reg {
@@ -86,6 +86,78 @@ pub enum Reg {
     DIL,
     SPL,
     BPL,
+}
+
+impl SizedOperand for Reg {
+    fn size(&self) -> OpSize {
+        match self {
+            Reg::AL
+            | Reg::CL
+            | Reg::DL
+            | Reg::BL
+            | Reg::SPL
+            | Reg::BPL
+            | Reg::SIL
+            | Reg::DIL
+            | Reg::R8b
+            | Reg::R9b
+            | Reg::R10b 
+            | Reg::R11b 
+            | Reg::R12b
+            | Reg::R13b 
+            | Reg::R14b 
+            | Reg::R15b => OpSize::U8,
+            Reg::AX
+            | Reg::CX
+            | Reg::DX
+            | Reg::BX
+            | Reg::SP
+            | Reg::BP
+            | Reg::SI
+            | Reg::DI
+            | Reg::R8w
+            | Reg::R9w
+            | Reg::R10w 
+            | Reg::R11w 
+            | Reg::R12w
+            | Reg::R13w 
+            | Reg::R14w 
+            | Reg::R15w => OpSize::U16,
+            Reg::EAX
+            | Reg::ECX
+            | Reg::EDX
+            | Reg::EBX
+            | Reg::ESP
+            | Reg::EBP
+            | Reg::ESI
+            | Reg::EDI
+            | Reg::R8d
+            | Reg::R9d
+            | Reg::R10d 
+            | Reg::R11d 
+            | Reg::R12d
+            | Reg::R13d 
+            | Reg::R14d 
+            | Reg::R15d => OpSize::U32,
+            Reg::RAX
+            | Reg::RCX
+            | Reg::RDX
+            | Reg::RBX
+            | Reg::RSP
+            | Reg::RBP
+            | Reg::RSI
+            | Reg::RDI
+            | Reg::R8
+            | Reg::R9
+            | Reg::R10 
+            | Reg::R11 
+            | Reg::R12
+            | Reg::R13 
+            | Reg::R14 
+            | Reg::R15 => OpSize::U64,
+            _ => OpSize::CpuMode,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
