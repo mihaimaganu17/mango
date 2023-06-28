@@ -36,7 +36,7 @@ impl Disassembler {
     pub fn parse(&self, reader: &mut Reader) -> Result<(), DisassemblerError> {
         // Initialize a counter for how many instructions we have parsed
         let mut parser_insts = 0;
-        while parser_insts < 20 {
+        while parser_insts < 32 {
             let arch = Some(Arch::Arch64);
             let instruction = Instruction::from_reader(reader, arch)?;
             parser_insts += 1;

@@ -170,6 +170,8 @@ impl Instruction {
                 // Parse the ModRM byte
                 let mut modrm = ModRM::from_byte_with_arch(modrm_byte, maybe_arch, maybe_rex);
 
+                println!("Modrm {:?}", modrm);
+
                 // Based on the addressing mode of the CPU, we have to/or not read the SIB byte
                 if let Some(arch) = maybe_arch {
                     match arch {
@@ -193,6 +195,7 @@ impl Instruction {
                             if modrm.1.has_sib() {
                                 let sib_byte = reader.read::<u8>()?;
                                 let mut sib = Sib::Sib64(Sib64::from_byte_with_rex(sib_byte, maybe_rex));
+                                println!("Sib {sib:#?}");
                                 // We know that we have a SIB, so we must take care now of how we
                                 // compute the effective address
                                 if modrm.1.mod_bits() == 0b00 {

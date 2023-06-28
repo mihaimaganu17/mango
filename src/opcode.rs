@@ -339,6 +339,140 @@ impl Opcode {
                     encoding,
                 })
             }
+            // ADC opcodes
+            0x10 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::from_map(AddressingMethod::E, OperandType::B, arch));
+                operands[1] = Some(Operand::from_map(AddressingMethod::G, OperandType::B, arch));
+                let encoding = Some(OperandEncoding::MR);
+                Ok(Opcode {
+                    ident: OpcodeType::Adc,
+                    operands,
+                    encoding,
+                })
+            }
+            0x11 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::from_map(AddressingMethod::E, OperandType::V, arch));
+                operands[1] = Some(Operand::from_map(AddressingMethod::G, OperandType::V, arch));
+                let encoding = Some(OperandEncoding::MR);
+                Ok(Opcode {
+                    ident: OpcodeType::Adc,
+                    operands,
+                    encoding,
+                })
+            }
+            0x12 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::from_map(AddressingMethod::G, OperandType::B, arch));
+                operands[1] = Some(Operand::from_map(AddressingMethod::E, OperandType::B, arch));
+                let encoding = Some(OperandEncoding::RM);
+                Ok(Opcode {
+                    ident: OpcodeType::Adc,
+                    operands,
+                    encoding,
+                })
+            }
+            0x13 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::from_map(AddressingMethod::G, OperandType::V, arch));
+                operands[1] = Some(Operand::from_map(AddressingMethod::E, OperandType::V, arch));
+                let encoding = Some(OperandEncoding::RM);
+                Ok(Opcode {
+                    ident: OpcodeType::Adc,
+                    operands,
+                    encoding,
+                })
+            }
+            0x14 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::Reg(Reg::AL));
+                operands[1] = Some(Operand::from_map(AddressingMethod::I, OperandType::B, arch));
+                let encoding = Some(OperandEncoding::I);
+                Ok(Opcode {
+                    ident: OpcodeType::Adc,
+                    operands,
+                    encoding,
+                })
+            }
+            0x15 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::RegFamily(RegFamily::Accumulator));
+                operands[1] = Some(Operand::from_map(AddressingMethod::I, OperandType::Z, arch));
+                let encoding = Some(OperandEncoding::I);
+                Ok(Opcode {
+                    ident: OpcodeType::Adc,
+                    operands,
+                    encoding,
+                })
+            }
+            // AND opcodes
+            0x20 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::from_map(AddressingMethod::E, OperandType::B, arch));
+                operands[1] = Some(Operand::from_map(AddressingMethod::G, OperandType::B, arch));
+                let encoding = Some(OperandEncoding::MR);
+                Ok(Opcode {
+                    ident: OpcodeType::And,
+                    operands,
+                    encoding,
+                })
+            }
+            0x21 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::from_map(AddressingMethod::E, OperandType::V, arch));
+                operands[1] = Some(Operand::from_map(AddressingMethod::G, OperandType::V, arch));
+                let encoding = Some(OperandEncoding::MR);
+                Ok(Opcode {
+                    ident: OpcodeType::And,
+                    operands,
+                    encoding,
+                })
+            }
+            0x22 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::from_map(AddressingMethod::G, OperandType::B, arch));
+                operands[1] = Some(Operand::from_map(AddressingMethod::E, OperandType::B, arch));
+                let encoding = Some(OperandEncoding::RM);
+                Ok(Opcode {
+                    ident: OpcodeType::And,
+                    operands,
+                    encoding,
+                })
+            }
+            0x23 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::from_map(AddressingMethod::G, OperandType::V, arch));
+                operands[1] = Some(Operand::from_map(AddressingMethod::E, OperandType::V, arch));
+                let encoding = Some(OperandEncoding::RM);
+                Ok(Opcode {
+                    ident: OpcodeType::And,
+                    operands,
+                    encoding,
+                })
+            }
+            0x24 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::Reg(Reg::AL));
+                operands[1] = Some(Operand::from_map(AddressingMethod::I, OperandType::B, arch));
+                let encoding = Some(OperandEncoding::I);
+                Ok(Opcode {
+                    ident: OpcodeType::And,
+                    operands,
+                    encoding,
+                })
+            }
+            0x25 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::RegFamily(RegFamily::Accumulator));
+                operands[1] = Some(Operand::from_map(AddressingMethod::I, OperandType::Z, arch));
+                let encoding = Some(OperandEncoding::I);
+                Ok(Opcode {
+                    ident: OpcodeType::And,
+                    operands,
+                    encoding,
+                })
+            }
             // XOR opcodes
             0x30 => {
                 let mut operands = [None, None, None, None];
