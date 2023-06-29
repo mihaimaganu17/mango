@@ -163,12 +163,88 @@ impl SizedOperand for Reg {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegFamily {
     Accumulator,
+    Counter,
+    Data,
+    Base,
+    StackPointer,
+    BasePointer,
+    Source,
+    Destination,
+    R8Reg,
+    R9Reg,
+    R10Reg,
+    R11Reg,
+    R12Reg,
+    R13Reg,
+    R14Reg,
+    R15Reg,
+}
+
+impl From<u8> for RegFamily {
+    fn from(value: u8) -> Self {
+        let lower_4bits = value & 0b1111;
+        match lower_4bits {
+            0b0000 => Self::Accumulator,
+            0b0001 => Self::Counter,
+            0b0010 => Self::Data,
+            0b0011 => Self::Base,
+            0b0100 => Self::StackPointer,
+            0b0101 => Self::BasePointer,
+            0b0110 => Self::Source,
+            0b0111 => Self::Destination,
+            0b1000 => Self::R8Reg,
+            0b1001 => Self::R9Reg,
+            0b1010 => Self::R10Reg,
+            0b1011 => Self::R11Reg,
+            0b1100 => Self::R12Reg,
+            0b1101 => Self::R13Reg,
+            0b1110 => Self::R14Reg,
+            0b1111 => Self::R15Reg,
+            _ => unreachable!(),
+        }
+    }
 }
 
 impl RegFamily {
     pub fn reg_from(&self, op_size: &OpSize) -> Reg {
         match self {
             Self::Accumulator => Accumulator::from_opsize(op_size),
+            Self::Counter => Counter::from_opsize(op_size),
+            Self::Data => Data::from_opsize(op_size),
+            Self::Base => Base::from_opsize(op_size),
+            Self::StackPointer => StackPointer::from_opsize(op_size),
+            Self::BasePointer => BasePointer::from_opsize(op_size),
+            Self::Source => Source::from_opsize(op_size),
+            Self::Destination => Destination::from_opsize(op_size),
+            Self::R8Reg => R8Reg::from_opsize(op_size),
+            Self::R9Reg => R9Reg::from_opsize(op_size),
+            Self::R10Reg => R10Reg::from_opsize(op_size),
+            Self::R11Reg => R11Reg::from_opsize(op_size),
+            Self::R12Reg => R12Reg::from_opsize(op_size),
+            Self::R13Reg => R13Reg::from_opsize(op_size),
+            Self::R14Reg => R14Reg::from_opsize(op_size),
+            Self::R15Reg => R15Reg::from_opsize(op_size),
+        }
+    }
+
+    pub fn reg_from_arch(&self, arch: &Arch) -> Reg {
+        match self {
+            Self::Accumulator => Accumulator::from_arch(arch),
+            Self::Counter => Counter::from_arch(arch),
+            Self::Data => Data::from_arch(arch),
+            Self::Base => Base::from_arch(arch),
+            Self::StackPointer => StackPointer::from_arch(arch),
+            Self::BasePointer => BasePointer::from_arch(arch),
+            Self::Source => Source::from_arch(arch),
+            Self::Destination => Destination::from_arch(arch),
+            Self::R8Reg => R8Reg::from_arch(arch),
+            Self::R9Reg => R9Reg::from_arch(arch),
+            Self::R10Reg => R10Reg::from_arch(arch),
+            Self::R11Reg => R11Reg::from_arch(arch),
+            Self::R12Reg => R12Reg::from_arch(arch),
+            Self::R13Reg => R13Reg::from_arch(arch),
+            Self::R14Reg => R14Reg::from_arch(arch),
+            Self::R15Reg => R15Reg::from_arch(arch),
         }
     }
 }
@@ -186,6 +262,15 @@ pub trait Gpr {
             OpSize::U16 => Self::Reg16Bit,
             OpSize::U32 => Self::Reg32Bit,
             OpSize::U64 => Self::Reg64Bit, 
+            _ => Self::Reg32Bit,
+        }
+    }
+
+    fn from_arch(arch: &Arch) -> Reg {
+        match arch {
+            Arch::Arch16 => Self::Reg16Bit,
+            Arch::Arch32 => Self::Reg32Bit,
+            Arch::Arch64 => Self::Reg64Bit, 
             _ => Self::Reg32Bit,
         }
     }

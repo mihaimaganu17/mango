@@ -2,7 +2,7 @@ use crate::{
     opcode::{AddrSize, Operand, Opcode, OpcodeType, OpcodeError, OperandEncoding, OpSize, RegFieldExt, RegFieldExtError},
     prefix::Prefix,
     rex::Rex,
-    reg::Reg,
+    reg::{Reg, RegFamily},
     reader::{Reader, ReaderError},
     modrm::{EffAddrType, Arch, ModRM, Sib, Sib32, Sib64},
     imm::{DispArch, Displacement, DispError, Immediate, ImmError},
@@ -17,7 +17,7 @@ pub struct Instruction {
     // mode
     rex: Option<Rex>,
     // 1, 2, or 3-byte sequence that identifies the instruction type
-    opcode: Opcode,
+    pub opcode: Opcode,
     // A list of, maximum 4 operands, or a minumum of 0 operands that are used by the instruction.
     // operands: [Option<Operand>; 4],
     // The encoding, describes the type of operands, their sizes, location and how they are used in
@@ -148,6 +148,7 @@ impl Instruction {
         }
 
         let modrm_encodings = [
+            OperandEncoding::M,
             OperandEncoding::MI,
             OperandEncoding::MR,
             OperandEncoding::RM,
@@ -294,6 +295,31 @@ impl Instruction {
                     }
                     resolved_operands[idx] = Some(ResolvedOperand::Immediate(imm));
                 }
+                // Handle the family
+                Some(Operand::RegInOpcode(opcode_byte)) => {
+                    println!("OpcodeByte {opcode_byte:x?}\n{maybe_rex:?}");
+                    let lower_3bits = opcode_byte & 0b111;
+                    let reg_64bit_encoding = if let Some(rex) = maybe_rex {
+                        lower_3bits | (rex.b() << 3) 
+                    } else {
+                        lower_3bits
+                    };
+                    // Unfortunately, depending on the size and the default mode, we can only
+                    // encode certain types of operands depending on architecture
+                    let arch = match (cpu_mode, op_size_override) {
+                        (Arch::Arch16, OpSize::U16) 
+                        | (Arch::Arch32, OpSize::U16)
+                        | (Arch::Arch64, OpSize::U16) => Arch::Arch16,
+                        (Arch::Arch32, OpSize::U16) => Arch::Arch16,
+                        (Arch::Arch32, OpSize::U32) => Arch::Arch32,
+                        (Arch::Arch64, OpSize::U32)
+                        | (Arch::Arch64, OpSize::U64) => Arch::Arch64,
+                        (_, _) => Arch::Arch64,
+                    };
+                    let reg_family = RegFamily::from(reg_64bit_encoding);
+                    let reg = reg_family.reg_from_arch(&arch);
+                    resolved_operands[idx] = Some(ResolvedOperand::Reg(reg));
+                }
                 Some(Operand::RegFamily(family)) => {
                     let reg = family.reg_from(&op_size_override);
                     resolved_operands[idx] = Some(ResolvedOperand::Reg(reg));
@@ -330,6 +356,7 @@ impl Instruction {
                                 (eff_addr, sib, maybe_disp)
                             }
                         };
+ 
                         resolved_operands[idx] = Some(ResolvedOperand::Mem(mem));
                     }
                 }

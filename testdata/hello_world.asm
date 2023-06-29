@@ -2,6 +2,21 @@ section .text
 global _start
 
 _start:
+    ; Push instructions
+    ; 0xFF /6
+    push dx
+;    push ebp
+    push r13
+    push r10w
+;    push edi
+    push rax
+    push word [rax]
+    push qword [rax]
+    push word [rcx*2]
+    push qword [rcx*2]
+    push word [ecx*4+0xcafe]
+    push qword [ecx*4+0xcafe]
+
     ; AND instructions with a 0x35 prefix
     and al, 0x1
     and ax, 0x1000

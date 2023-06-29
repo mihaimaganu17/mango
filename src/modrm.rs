@@ -428,8 +428,6 @@ impl EffAddr64Bit {
         // Get Mod
         let mod_addr = value >> 6 & 0b11;
 
-        println!("{mod_addr:?} ----- {r_m:?}");
-
         let eff_addr_64bit = match mod_addr {
             0b00 => {
                 match r_m {
