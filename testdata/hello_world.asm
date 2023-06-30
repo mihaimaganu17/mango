@@ -2,6 +2,100 @@ section .text
 global _start
 
 _start:
+    ; Push instructions
+    ; 0xFF /6
+    push dx
+;    push ebp
+    push r13
+    push r10w
+;    push edi
+    push rax
+    push word [rax]
+    push qword [rax]
+    push word [rcx*2]
+    push qword [rcx*2]
+    push word [ecx*4+0xcafe]
+    push qword [ecx*4+0xcafe]
+
+    ; AND instructions with a 0x35 prefix
+    and al, 0x1
+    and ax, 0x1000
+    and eax, 0x100000
+    and rax, 0x5fffffff
+
+    and bl, 0x1
+    and bx, 0x1000
+
+    ; 0x80 prefix
+    and bl, 0x1
+
+    ; 0x81 prefix
+    and bx, 0x1000
+    and ebx, 0x11111111
+    and rbx, 0x5fffffff
+
+    ; 0x83 prefix is only sign extensions, so no good
+    
+    ; 0x20 prefix
+    and al, bl
+
+    ; 0x21 prefix
+    and ax, bx
+    and eax, ebx
+    and rax, rbx
+
+    ; 0x21
+    and cx, ax
+    and [ecx], eax
+    and [r9], r10
+    ; 0x22
+    and dl, [r15*2]
+    ; 0x23
+    and cx, [r12]
+    and cx, [r12 + 0x19]
+    and cx, [r9*2 + 0xcafeb19]
+    and cx, [r12 + 0xcafeb19]
+    and cx, [r12*2]
+    and cx, [r12*8 + 0x19]
+    and cx, [r15]
+    and cx, [r15*2 + 0x19]
+    and cx, [r15*4 + 0xcafeb19]
+    and cx, [r15*8 + 0x19]
+    and cx, [r15*2]
+    and ecx, eax
+    and r10, [r9]
+
+    ; ADC instructions
+    ; 0x14
+    adc al, 10
+    ; 0x15
+    adc ax, 1700
+    adc eax, 0xafebabe
+    adc rax, 0xafebabe
+    ; 0x80
+    adc cl, 9
+    adc rcx, 80
+    ; 0x81
+    adc dx, 110
+    adc edx, 890
+    adc r13, 0xabecafe
+    ; 0x83
+    adc dx, -10
+    adc edx, -10
+    adc rcx, -10
+    ; 0x10
+    adc cl, al
+    ; 0x11
+    adc cx, ax
+    adc [ecx], eax
+    adc [r9], r10
+    ; 0x12
+    adc dl, [r15*2]
+    ; 0x13
+    adc cx, [r12*8 + 0x19]
+    adc ecx, eax
+    adc r10, [r9]
+    
     ; ADD instructions
     ; 0x04
     add al, 10

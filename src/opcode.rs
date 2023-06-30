@@ -36,6 +36,13 @@ pub enum OpcodeType {
     Sub,
     Cmp,
     Lea,
+    Inc,
+    Dec,
+    CallNear,
+    CallFar,
+    JmpNear,
+    JmpFar,
+    Push,
     // A bitwise XOR between 2 operands
     Xor,
     // The opcode alone is not enough and it needs an Extension from a ModRM field
@@ -85,6 +92,10 @@ pub enum OperandType {
 pub enum OperandEncoding {
     // Op1 = AL/AX/EAX/RAX, Op2 = imm8/16/32
     I,
+    // Op1 = ModRM:r/m(r)
+    M,
+    // Op1 is encoded in the lower 3 bits of the opcode
+    O,
     // Op1 = ModRM:r/m(r, w), Op2 = imm8/16/32
     MI,
     // Op1 = ModRM:r/m(r, w), Op2 = ModRM:reg(r)
@@ -158,7 +169,7 @@ impl From<Arch> for OpSize {
         match value {
             Arch::Arch16 => Self::U16,
             // In both 32-bit and 64-bit mode, the default operand size, is 32-bit,
-            Arch::Arch64 | Arch::Arch32 => Self::U32,
+            Arch::Arch32 | Arch::Arch64 => Self::U32,
         }
     }
 }
@@ -193,6 +204,8 @@ pub enum Operand {
     Reg(Reg),
     // The operand is a family of registers and reffers to General Purpose Registers
     RegFamily(RegFamily),
+    // The operand is a register enclosed in the opcode
+    RegInOpcode(u8),
 }
 
 impl Operand {
@@ -339,6 +352,140 @@ impl Opcode {
                     encoding,
                 })
             }
+            // ADC opcodes
+            0x10 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::from_map(AddressingMethod::E, OperandType::B, arch));
+                operands[1] = Some(Operand::from_map(AddressingMethod::G, OperandType::B, arch));
+                let encoding = Some(OperandEncoding::MR);
+                Ok(Opcode {
+                    ident: OpcodeType::Adc,
+                    operands,
+                    encoding,
+                })
+            }
+            0x11 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::from_map(AddressingMethod::E, OperandType::V, arch));
+                operands[1] = Some(Operand::from_map(AddressingMethod::G, OperandType::V, arch));
+                let encoding = Some(OperandEncoding::MR);
+                Ok(Opcode {
+                    ident: OpcodeType::Adc,
+                    operands,
+                    encoding,
+                })
+            }
+            0x12 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::from_map(AddressingMethod::G, OperandType::B, arch));
+                operands[1] = Some(Operand::from_map(AddressingMethod::E, OperandType::B, arch));
+                let encoding = Some(OperandEncoding::RM);
+                Ok(Opcode {
+                    ident: OpcodeType::Adc,
+                    operands,
+                    encoding,
+                })
+            }
+            0x13 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::from_map(AddressingMethod::G, OperandType::V, arch));
+                operands[1] = Some(Operand::from_map(AddressingMethod::E, OperandType::V, arch));
+                let encoding = Some(OperandEncoding::RM);
+                Ok(Opcode {
+                    ident: OpcodeType::Adc,
+                    operands,
+                    encoding,
+                })
+            }
+            0x14 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::Reg(Reg::AL));
+                operands[1] = Some(Operand::from_map(AddressingMethod::I, OperandType::B, arch));
+                let encoding = Some(OperandEncoding::I);
+                Ok(Opcode {
+                    ident: OpcodeType::Adc,
+                    operands,
+                    encoding,
+                })
+            }
+            0x15 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::RegFamily(RegFamily::Accumulator));
+                operands[1] = Some(Operand::from_map(AddressingMethod::I, OperandType::Z, arch));
+                let encoding = Some(OperandEncoding::I);
+                Ok(Opcode {
+                    ident: OpcodeType::Adc,
+                    operands,
+                    encoding,
+                })
+            }
+            // AND opcodes
+            0x20 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::from_map(AddressingMethod::E, OperandType::B, arch));
+                operands[1] = Some(Operand::from_map(AddressingMethod::G, OperandType::B, arch));
+                let encoding = Some(OperandEncoding::MR);
+                Ok(Opcode {
+                    ident: OpcodeType::And,
+                    operands,
+                    encoding,
+                })
+            }
+            0x21 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::from_map(AddressingMethod::E, OperandType::V, arch));
+                operands[1] = Some(Operand::from_map(AddressingMethod::G, OperandType::V, arch));
+                let encoding = Some(OperandEncoding::MR);
+                Ok(Opcode {
+                    ident: OpcodeType::And,
+                    operands,
+                    encoding,
+                })
+            }
+            0x22 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::from_map(AddressingMethod::G, OperandType::B, arch));
+                operands[1] = Some(Operand::from_map(AddressingMethod::E, OperandType::B, arch));
+                let encoding = Some(OperandEncoding::RM);
+                Ok(Opcode {
+                    ident: OpcodeType::And,
+                    operands,
+                    encoding,
+                })
+            }
+            0x23 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::from_map(AddressingMethod::G, OperandType::V, arch));
+                operands[1] = Some(Operand::from_map(AddressingMethod::E, OperandType::V, arch));
+                let encoding = Some(OperandEncoding::RM);
+                Ok(Opcode {
+                    ident: OpcodeType::And,
+                    operands,
+                    encoding,
+                })
+            }
+            0x24 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::Reg(Reg::AL));
+                operands[1] = Some(Operand::from_map(AddressingMethod::I, OperandType::B, arch));
+                let encoding = Some(OperandEncoding::I);
+                Ok(Opcode {
+                    ident: OpcodeType::And,
+                    operands,
+                    encoding,
+                })
+            }
+            0x25 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::RegFamily(RegFamily::Accumulator));
+                operands[1] = Some(Operand::from_map(AddressingMethod::I, OperandType::Z, arch));
+                let encoding = Some(OperandEncoding::I);
+                Ok(Opcode {
+                    ident: OpcodeType::And,
+                    operands,
+                    encoding,
+                })
+            }
             // XOR opcodes
             0x30 => {
                 let mut operands = [None, None, None, None];
@@ -366,8 +513,14 @@ impl Opcode {
                 operands: [Some(Operand::RegFamily(RegFamily::Accumulator)), Some(Operand::Immediate(OpSize::U32)), None, None],
                 encoding: Some(OperandEncoding::I),
             }),
+            // Push Opcode with general register
+            0x50 | 0x51 | 0x52 | 0x53 | 0x54 | 0x55 | 0x56 | 0x57 => Ok(Opcode {
+                ident: OpcodeType::Push,
+                operands: [Some(Operand::RegInOpcode(byte)), None, None, None],
+                encoding: Some(OperandEncoding::O),
+            }),
             // Immediate Group 1, which needs extension from ModRM in order to get the opcode
-            0x80 | 0x81 | 0x82 | 0x83 => Ok(Opcode {
+            0x80 | 0x81 | 0x82 | 0x83 | 0xFF => Ok(Opcode {
                 ident: OpcodeType::NeedsModRMExtension(byte),
                 operands: [None, None, None, None],
                 encoding: None,
@@ -411,23 +564,47 @@ impl Opcode {
                         self.operands[1] = Some(Operand::from_map(AddressingMethod::I, OperandType::B, arch));
                         self.encoding = Some(OperandEncoding::MI);
                     }
+                    0xFF => {
+                        self.operands[0] = Some(Operand::from_map(AddressingMethod::E, OperandType::V, arch));
+                        self.encoding = Some(OperandEncoding::MI);
+                    }
                     _ => {},
                 }
             }
             _ => {},
         };
 
-        self.ident = match ext.0 {
-            0 => OpcodeType::Add,
-            1 => OpcodeType::Or,
-            2 => OpcodeType::Adc,
-            3 => OpcodeType::Sbb,
-            4 => OpcodeType::And,
-            5 => OpcodeType::Sub,
-            6 => OpcodeType::Xor,
-            7 => OpcodeType::Cmp,
-            _ => unreachable!(),
-        };
+        if let OpcodeType::NeedsModRMExtension(byte) = self.ident {
+            // Depending on the opcode, we have specific identificators for instructions
+            match byte {
+                0x80 | 0x81 | 0x82 | 0x83 => {
+                    self.ident = match ext.0 {
+                        0 => OpcodeType::Add,
+                        1 => OpcodeType::Or,
+                        2 => OpcodeType::Adc,
+                        3 => OpcodeType::Sbb,
+                        4 => OpcodeType::And,
+                        5 => OpcodeType::Sub,
+                        6 => OpcodeType::Xor,
+                        7 => OpcodeType::Cmp,
+                        _ => unreachable!(),
+                    };
+                }
+                0xFF => {
+                    self.ident = match ext.0 {
+                        0 => OpcodeType::Inc,
+                        1 => OpcodeType::Dec,
+                        2 => OpcodeType::CallNear,
+                        3 => OpcodeType::CallFar,
+                        4 => OpcodeType::JmpNear,
+                        5 => OpcodeType::JmpFar,
+                        6 => OpcodeType::Push,
+                        _ => unreachable!(),
+                    };
+                }
+                _ => todo!(),
+            }
+        }
 
         Ok(())
     }

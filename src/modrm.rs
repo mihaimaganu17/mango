@@ -428,8 +428,6 @@ impl EffAddr64Bit {
         // Get Mod
         let mod_addr = value >> 6 & 0b11;
 
-        println!("{mod_addr:?} ----- {r_m:?}");
-
         let eff_addr_64bit = match mod_addr {
             0b00 => {
                 match r_m {
@@ -445,7 +443,7 @@ impl EffAddr64Bit {
                     0b1001 => (EffAddrType::Reg(Reg::R9), None),
                     0b1010 => (EffAddrType::Reg(Reg::R10), None),
                     0b1011 => (EffAddrType::Reg(Reg::R11), None),
-                    0b1100 => (EffAddrType::Reg(Reg::R12), None),
+                    0b1100 => (EffAddrType::Sib, None),
                     0b1101 => (EffAddrType::Reg(Reg::R13), Some(DispArch::Bit32)),
                     0b1110 => (EffAddrType::Reg(Reg::R14), None),
                     0b1111 => (EffAddrType::Reg(Reg::R15), None),
@@ -468,7 +466,7 @@ impl EffAddr64Bit {
                     0b1001 => (EffAddrType::Reg(Reg::R9), Some(DispArch::Bit8)),
                     0b1010 => (EffAddrType::Reg(Reg::R10), Some(DispArch::Bit8)),
                     0b1011 => (EffAddrType::Reg(Reg::R11), Some(DispArch::Bit8)),
-                    0b1100 => (EffAddrType::Reg(Reg::R12), Some(DispArch::Bit8)),
+                    0b1100 => (EffAddrType::Sib, Some(DispArch::Bit8)),
                     0b1101 => (EffAddrType::Reg(Reg::R13), Some(DispArch::Bit8)),
                     0b1110 => (EffAddrType::Reg(Reg::R14), Some(DispArch::Bit8)),
                     0b1111 => (EffAddrType::Reg(Reg::R15), Some(DispArch::Bit8)),
@@ -491,7 +489,7 @@ impl EffAddr64Bit {
                     0b1001 => (EffAddrType::Reg(Reg::R9), Some(DispArch::Bit32)),
                     0b1010 => (EffAddrType::Reg(Reg::R10), Some(DispArch::Bit32)),
                     0b1011 => (EffAddrType::Reg(Reg::R11), Some(DispArch::Bit32)),
-                    0b1100 => (EffAddrType::Reg(Reg::R12), Some(DispArch::Bit32)),
+                    0b1100 => (EffAddrType::Sib, Some(DispArch::Bit32)),
                     0b1101 => (EffAddrType::Reg(Reg::R13), Some(DispArch::Bit32)),
                     0b1110 => (EffAddrType::Reg(Reg::R14), Some(DispArch::Bit32)),
                     0b1111 => (EffAddrType::Reg(Reg::R15), Some(DispArch::Bit32)),
