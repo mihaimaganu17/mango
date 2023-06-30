@@ -3,7 +3,7 @@ use crate::{
     prefix::{Prefix, Group1},
     reader::{Reader, ReaderError},
     rex::Rex,
-    reg::{Reg, RegFamily, Accumulator, Gpr},
+    reg::{Reg, RegFamily, SegmentRegister, Accumulator, Gpr},
     modrm::Arch,
 };
 
@@ -206,6 +206,8 @@ pub enum Operand {
     RegFamily(RegFamily),
     // The operand is a register enclosed in the opcode
     RegInOpcode(u8),
+    // The operand represents a segment selector
+    Segment(SegmentRegister),
 }
 
 impl Operand {
@@ -234,6 +236,7 @@ pub enum OpcodeError {
     ReaderError(ReaderError),
     InvalidPrefix(Prefix),
     InexistentPrefix,
+    InvalidOpcode(u8),
     Invalid3ByteOpcode(u8, u8, u8),
 }
 
@@ -352,6 +355,28 @@ impl Opcode {
                     encoding,
                 })
             }
+            // Push Extra Selector
+            0x06 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::Segment(SegmentRegister::ES));
+                let encoding = Some(OperandEncoding::ZO);
+                Ok(Opcode {
+                    ident: OpcodeType::Push,
+                    operands,
+                    encoding,
+                })
+            }
+            // Push Code Selector
+            0x0e => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::Segment(SegmentRegister::CS));
+                let encoding = Some(OperandEncoding::ZO);
+                Ok(Opcode {
+                    ident: OpcodeType::Push,
+                    operands,
+                    encoding,
+                })
+            }
             // ADC opcodes
             0x10 => {
                 let mut operands = [None, None, None, None];
@@ -415,6 +440,28 @@ impl Opcode {
                 let encoding = Some(OperandEncoding::I);
                 Ok(Opcode {
                     ident: OpcodeType::Adc,
+                    operands,
+                    encoding,
+                })
+            }
+            // Push Stack Selector
+            0x16 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::Segment(SegmentRegister::SS));
+                let encoding = Some(OperandEncoding::ZO);
+                Ok(Opcode {
+                    ident: OpcodeType::Push,
+                    operands,
+                    encoding,
+                })
+            }
+            // Push Data Selector
+            0x1e => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::Segment(SegmentRegister::DS));
+                let encoding = Some(OperandEncoding::ZO);
+                Ok(Opcode {
+                    ident: OpcodeType::Push,
                     operands,
                     encoding,
                 })
@@ -519,6 +566,27 @@ impl Opcode {
                 operands: [Some(Operand::RegInOpcode(byte)), None, None, None],
                 encoding: Some(OperandEncoding::O),
             }),
+            // Push Opcode for immediates
+            0x68 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::from_map(AddressingMethod::I, OperandType::Z, arch));
+                let encoding = Some(OperandEncoding::I);
+                Ok(Opcode {
+                    ident: OpcodeType::Push,
+                    operands,
+                    encoding,
+                })
+            }
+            0x6A => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::from_map(AddressingMethod::I, OperandType::B, arch));
+                let encoding = Some(OperandEncoding::I);
+                Ok(Opcode {
+                    ident: OpcodeType::Push,
+                    operands,
+                    encoding,
+                })
+            }
             // Immediate Group 1, which needs extension from ModRM in order to get the opcode
             0x80 | 0x81 | 0x82 | 0x83 | 0xFF => Ok(Opcode {
                 ident: OpcodeType::NeedsModRMExtension(byte),
@@ -621,7 +689,34 @@ impl Opcode {
             // If we found an escape code, than we know that the Opcode is 2 or 3 bytes long
             opcode_prefix::ESCAPE_CODE => {
                 match prefixs.len() {
-                    0 => Err(OpcodeError::InexistentPrefix),
+                    0 => {
+                        let second_byte = reader.read::<u8>()?;
+                        match second_byte {
+                            // Push FS Selector
+                            0xA0 => {
+                                let mut operands = [None, None, None, None];
+                                operands[0] = Some(Operand::Segment(SegmentRegister::FS));
+                                let encoding = Some(OperandEncoding::ZO);
+                                Ok(Opcode {
+                                    ident: OpcodeType::Push,
+                                    operands,
+                                    encoding,
+                                })
+                            }
+                            // Push GS Selector
+                            0xA8 => {
+                                let mut operands = [None, None, None, None];
+                                operands[0] = Some(Operand::Segment(SegmentRegister::GS));
+                                let encoding = Some(OperandEncoding::ZO);
+                                Ok(Opcode {
+                                    ident: OpcodeType::Push,
+                                    operands,
+                                    encoding,
+                                })
+                            }
+                            _ => Err(OpcodeError::InvalidOpcode(second_byte)),
+                        }
+                    }
                     _ => {
                         let prefix = prefixs[0];
                         match prefix {

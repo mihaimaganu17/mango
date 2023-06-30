@@ -14,6 +14,7 @@ mod tests {
     use crate::{
         reader::Reader,
         dis::Disassembler,
+        modrm::Arch,
     };
 
     #[test]
@@ -61,11 +62,11 @@ mod tests {
         let mut reader = Reader::from_vec(exec_bytes.to_vec());
         let dis = Disassembler;
 
-        dis.parse(&mut reader).unwrap();
+        dis.parse(&mut reader, Some(Arch::Arch64)).unwrap();
     }
 
     #[test]
-    fn test_dis_parse_hello() {
+    fn test_dis_parse_hello_x64() {
         let ls_path = "hello_world_lea_xor";
         let bytes = fs::read(ls_path).unwrap();
 
@@ -74,6 +75,19 @@ mod tests {
         let mut reader = Reader::from_vec(exec_bytes.to_vec());
         let dis = Disassembler;
 
-        dis.parse(&mut reader).unwrap();
+        dis.parse(&mut reader, Some(Arch::Arch64)).unwrap();
+    }
+
+    //#[test]
+    fn test_dis_parse_hello_x86() {
+        let ls_path = "hello_world_x86";
+        let bytes = fs::read(ls_path).unwrap();
+
+        let exec_bytes = bytes.get(0x1000..0x1008).unwrap();
+
+        let mut reader = Reader::from_vec(exec_bytes.to_vec());
+        let dis = Disassembler;
+
+        dis.parse(&mut reader, Some(Arch::Arch32)).unwrap();
     }
 }

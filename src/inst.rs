@@ -2,7 +2,7 @@ use crate::{
     opcode::{AddrSize, Operand, Opcode, OpcodeType, OpcodeError, OperandEncoding, OpSize, RegFieldExt, RegFieldExtError},
     prefix::Prefix,
     rex::Rex,
-    reg::{Reg, RegFamily},
+    reg::{Reg, RegFamily, SegmentRegister},
     reader::{Reader, ReaderError},
     modrm::{EffAddrType, Arch, ModRM, Sib, Sib32, Sib64},
     imm::{DispArch, Displacement, DispError, Immediate, ImmError},
@@ -43,6 +43,7 @@ pub struct Instruction {
 pub enum ResolvedOperand {
     Immediate(Immediate),
     Reg(Reg),
+    Segment(SegmentRegister),
     Mem((EffAddrType, Option<Sib>, Option<Displacement>)),
     ToBeDecided,
 }
@@ -91,27 +92,24 @@ impl Instruction {
         };
 
         // Try and parse the byte as an Opcode
-        let mut first_opcode = Opcode::from_reader_with_arch(reader, cpu_mode)?;
+        let mut first_opcode = Opcode::with_prefix_arch(reader, &prefixs, cpu_mode)?;
 
         let mut prefix_idx = 0;
         while let OpcodeType::Prefix(op_prefix) = first_opcode.ident {
             prefixs.push(op_prefix);
             first_opcode = Opcode::with_prefix_arch(reader, &prefixs, cpu_mode)?;
+            prefix_idx += 1;
 
             if prefix_idx == 3 {
                 break;
             }
         }
 
-        // Based on wheather we have a prefix or not, we read the second opcode.
-        let second_opcode = match first_opcode.ident {
-            // If we got a prefix, try and parse the next bytes, taking into acount that we have a
-            // prefix
-            OpcodeType::Prefix(op_prefix) => {
-                prefixs.push(op_prefix);
-                Opcode::with_prefix_arch(reader, &prefixs, cpu_mode)?
-            }
-            _ => first_opcode
+        // We may not need this anymore
+        let second_opcode = if let OpcodeType::Prefix(_) = first_opcode.ident {
+            Opcode::with_prefix_arch(reader, &prefixs, cpu_mode)?
+        } else {
+            first_opcode
         };
 
         // At this point we know that the second opcode cannot be a normal prefix.
@@ -121,13 +119,7 @@ impl Instruction {
             OpcodeType::Rex(op_rex) => {
                 // Initialize our own REX
                 maybe_rex = Some(op_rex);
-                 
-                // At this point we need to take into acount if we do have a prefix or not. This is
-                // because the prefix can change the opcode and the instruction
-                match prefixs.len() {
-                    0 => Opcode::from_reader_with_arch(reader, cpu_mode)?,
-                    _ => Opcode::with_prefix_arch(reader, &prefixs, cpu_mode)?, 
-                }
+                Opcode::with_prefix_arch(reader, &prefixs, cpu_mode)? 
             }
             _ => second_opcode,
         };
@@ -152,7 +144,6 @@ impl Instruction {
             OperandEncoding::MI,
             OperandEncoding::MR,
             OperandEncoding::RM,
-            OperandEncoding::ZO
         ];
 
 
@@ -324,6 +315,7 @@ impl Instruction {
                     let reg = family.reg_from(&op_size_override);
                     resolved_operands[idx] = Some(ResolvedOperand::Reg(reg));
                 }
+                Some(Operand::Segment(seg_reg)) => resolved_operands[idx] = Some(ResolvedOperand::Segment(*seg_reg)),
                 Some(Operand::Reg(reg)) => resolved_operands[idx] = Some(ResolvedOperand::Reg(*reg)),
                 Some(Operand::ModRM(op_size, addr_size)) => {
                     let mut modrm = maybe_modrm.as_mut().ok_or(InstructionError::InvalidModRMError)?;

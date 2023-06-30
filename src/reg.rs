@@ -161,6 +161,16 @@ impl SizedOperand for Reg {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SegmentRegister {
+    CS,
+    DS,
+    SS,
+    ES,
+    FS,
+    GS,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegFamily {
     Accumulator,
     Counter,

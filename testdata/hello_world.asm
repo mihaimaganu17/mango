@@ -2,7 +2,14 @@ section .text
 global _start
 
 _start:
-    ; Push instructions
+    ; push instructions
+    ; push selectors
+    push fs
+    push gs
+    ; Push Immediates
+    push 0x8
+    push 1024
+    push 0xcafebab
     ; 0xFF /6
     push dx
 ;    push ebp
