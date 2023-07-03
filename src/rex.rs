@@ -53,7 +53,7 @@ impl Rex {
                 let x = (value >> 1) & 1;
                 let b = value & 1;
 
-                Some(Rex { w, r, x, b})
+                Some(Rex { w, r, x, b })
             }
             _ => None,
         }

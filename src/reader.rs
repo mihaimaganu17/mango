@@ -24,10 +24,7 @@ impl From<TryFromSliceError> for ReaderError {
 impl Reader {
     /// Create a new `Reader` from a vector of bytes
     pub fn from_vec(bytes: Vec<u8>) -> Self {
-        Self {
-            pos: 0,
-            bytes,
-        }
+        Self { pos: 0, bytes }
     }
 
     pub fn bytes_unread(&self) -> usize {
@@ -107,7 +104,7 @@ macro_rules! read_type {
                 Ok(Self::from_le_bytes(bytes.try_into()?))
             }
         }
-    }
+    };
 }
 
 read_type!(u8);

@@ -1,10 +1,10 @@
 //! Represents the ModR/M and SIB bytes parsing
 
 use crate::imm::DispArch;
+use crate::inst::SizedOperand;
+use crate::opcode::{AddrSize, OpSize};
 use crate::reg::Reg;
 use crate::rex::Rex;
-use crate::opcode::{AddrSize, OpSize};
-use crate::inst::SizedOperand;
 
 /// Made up of three parts:
 /// - R/M, bits[0:3]
@@ -21,7 +21,11 @@ use crate::inst::SizedOperand;
 pub struct ModRM(pub Reg, pub Addressing);
 
 impl ModRM {
-    pub fn from_byte_with_arch(value: u8, maybe_arch: Option<Arch>, maybe_rex: Option<Rex>) -> Self {
+    pub fn from_byte_with_arch(
+        value: u8,
+        maybe_arch: Option<Arch>,
+        maybe_rex: Option<Rex>,
+    ) -> Self {
         let reg = (value >> 3) & 0b111;
 
         // We compute the addressing form, based on what we are passed
@@ -32,13 +36,17 @@ impl ModRM {
                     Arch::Arch16 => (reg, Addressing::EffAddr16Bit(EffAddr16Bit::from(value))),
                     Arch::Arch32 => (reg, Addressing::EffAddr32Bit(EffAddr32Bit::from(value))),
                     Arch::Arch64 => {
-                        let addr = Addressing::EffAddr64Bit(EffAddr64Bit::from_byte_with_rex(value, maybe_rex));
+                        let addr = Addressing::EffAddr64Bit(EffAddr64Bit::from_byte_with_rex(
+                            value, maybe_rex,
+                        ));
 
                         let reg = match maybe_rex {
                             Some(rex) =>
-                                // No matter the case, the `r` field of the Rex prefix, will always have to be
-                                // prepended to the Reg
-                                (rex.r() << 3) | reg,
+                            // No matter the case, the `r` field of the Rex prefix, will always have to be
+                            // prepended to the Reg
+                            {
+                                (rex.r() << 3) | reg
+                            }
                             None => reg,
                         };
                         (reg, addr)
@@ -51,7 +59,6 @@ impl ModRM {
 
         // Get Mod
         let mod_addr = value >> 6 & 0b11;
-
 
         Self(Reg::from_byte_with_arch(reg, maybe_arch), addressing)
     }
@@ -89,15 +96,9 @@ impl Addressing {
     pub fn displacement(&self) -> Option<DispArch> {
         // Check for the addressing type
         match self {
-            Self::EffAddr16Bit(addr_16bit) => {
-                addr_16bit.maybe_disp
-            }
-            Self::EffAddr32Bit(addr_32bit) => {
-                addr_32bit.maybe_disp
-            }
-            Self::EffAddr64Bit(addr_64bit) => {
-                addr_64bit.maybe_disp
-            }
+            Self::EffAddr16Bit(addr_16bit) => addr_16bit.maybe_disp,
+            Self::EffAddr32Bit(addr_32bit) => addr_32bit.maybe_disp,
+            Self::EffAddr64Bit(addr_64bit) => addr_64bit.maybe_disp,
         }
     }
 
@@ -105,15 +106,9 @@ impl Addressing {
     pub fn set_displacement(&mut self, disp: Option<DispArch>) {
         // Check for the addressing type
         match self {
-            Self::EffAddr16Bit(addr_16bit) => {
-                addr_16bit.maybe_disp = disp
-            }
-            Self::EffAddr32Bit(addr_32bit) => {
-                addr_32bit.maybe_disp = disp
-            }
-            Self::EffAddr64Bit(addr_64bit) => {
-                addr_64bit.maybe_disp = disp
-            }
+            Self::EffAddr16Bit(addr_16bit) => addr_16bit.maybe_disp = disp,
+            Self::EffAddr32Bit(addr_32bit) => addr_32bit.maybe_disp = disp,
+            Self::EffAddr64Bit(addr_64bit) => addr_64bit.maybe_disp = disp,
         }
     }
 
@@ -127,9 +122,9 @@ impl Addressing {
         };
 
         if let EffAddrType::Sib = eff_addr {
-            return true
+            return true;
         } else {
-            return false
+            return false;
         }
     }
 
@@ -145,7 +140,9 @@ impl Addressing {
         match self {
             Self::EffAddr32Bit(eff_addr_32bit) => eff_addr_32bit.eff_addr,
             Self::EffAddr64Bit(eff_addr_64bit) => eff_addr_64bit.eff_addr,
-            Self::EffAddr16Bit(_) => panic!("Override addressing in 16 bit mode is not implemented"),
+            Self::EffAddr16Bit(_) => {
+                panic!("Override addressing in 16 bit mode is not implemented")
+            }
         }
     }
 
@@ -156,18 +153,14 @@ impl Addressing {
             Addressing::EffAddr16Bit(eff_addr_16bit) => {
                 return eff_addr_16bit.maybe_reg1;
             }
-            Addressing::EffAddr32Bit(eff_addr_32bit) => {
-                match eff_addr_32bit.eff_addr {
-                    EffAddrType::Reg(reg) => return Some(reg),
-                    _ => return None,
-                }
-            }
-            Addressing::EffAddr64Bit(eff_addr_64bit) => {
-                match eff_addr_64bit.eff_addr {
-                    EffAddrType::Reg(reg) => return Some(reg),
-                    _ => return None,
-                }
-            }
+            Addressing::EffAddr32Bit(eff_addr_32bit) => match eff_addr_32bit.eff_addr {
+                EffAddrType::Reg(reg) => return Some(reg),
+                _ => return None,
+            },
+            Addressing::EffAddr64Bit(eff_addr_64bit) => match eff_addr_64bit.eff_addr {
+                EffAddrType::Reg(reg) => return Some(reg),
+                _ => return None,
+            },
         }
     }
 }
@@ -190,7 +183,7 @@ pub struct EffAddr16Bit {
 }
 
 impl From<u8> for EffAddr16Bit {
-    fn from(value: u8) -> Self{
+    fn from(value: u8) -> Self {
         // Get R/M
         let r_m = value & 0b111;
         // Get Mod
@@ -319,7 +312,7 @@ impl EffAddrType {
 }
 
 impl From<u8> for EffAddr32Bit {
-    fn from(value: u8) -> Self{
+    fn from(value: u8) -> Self {
         // Get R/M
         let r_m = value & 0b111;
         // Get Mod
@@ -416,7 +409,7 @@ pub struct EffAddr64Bit {
 }
 
 impl EffAddr64Bit {
-    fn from_byte_with_rex(value: u8, maybe_rex: Option<Rex>) -> Self{
+    fn from_byte_with_rex(value: u8, maybe_rex: Option<Rex>) -> Self {
         // Get R/M
         let mut r_m = value & 0b111;
 
@@ -567,8 +560,8 @@ pub enum Sib {
 impl SizedOperand for Sib {
     fn size(&self) -> OpSize {
         match self {
-            Sib::Sib32(_) => OpSize::U32, 
-            Sib::Sib64(_) => OpSize::U64, 
+            Sib::Sib32(_) => OpSize::U32,
+            Sib::Sib64(_) => OpSize::U64,
         }
     }
 }
@@ -630,14 +623,14 @@ impl Sib {
 // This represents the top 2 bits(Scale parameter) of the SIB byte in an x86_64 instruction
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Scale(u8);
-        
+
 /// Represents a 32-bit Sib byte components
 // TODO: We should make this version and the 64-bit version into generics
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Sib32 {
     base: Option<Reg>,
     scaled_index: Option<Reg>,
-    scale: Option<Scale>
+    scale: Option<Scale>,
 }
 
 impl From<u8> for Sib32 {
@@ -669,7 +662,7 @@ impl From<u8> for Sib32 {
                 0b110 => (Some(Reg::ESI), None),
                 0b111 => (Some(Reg::EDI), None),
                 _ => unreachable!(),
-            }
+            },
             0b01 => match idx {
                 0b000 => (Some(Reg::EAX), Some(Scale(2))),
                 0b001 => (Some(Reg::ECX), Some(Scale(2))),
@@ -680,7 +673,7 @@ impl From<u8> for Sib32 {
                 0b110 => (Some(Reg::ESI), Some(Scale(2))),
                 0b111 => (Some(Reg::EDI), Some(Scale(2))),
                 _ => unreachable!(),
-            }
+            },
             0b10 => match idx {
                 0b000 => (Some(Reg::EAX), Some(Scale(4))),
                 0b001 => (Some(Reg::ECX), Some(Scale(4))),
@@ -691,7 +684,7 @@ impl From<u8> for Sib32 {
                 0b110 => (Some(Reg::ESI), Some(Scale(4))),
                 0b111 => (Some(Reg::EDI), Some(Scale(4))),
                 _ => unreachable!(),
-            }
+            },
             0b11 => match idx {
                 0b000 => (Some(Reg::EAX), Some(Scale(8))),
                 0b001 => (Some(Reg::ECX), Some(Scale(8))),
@@ -702,7 +695,7 @@ impl From<u8> for Sib32 {
                 0b110 => (Some(Reg::ESI), Some(Scale(8))),
                 0b111 => (Some(Reg::EDI), Some(Scale(8))),
                 _ => unreachable!(),
-            }
+            },
             _ => unreachable!(),
         };
 
@@ -719,7 +712,7 @@ impl From<u8> for Sib32 {
 pub struct Sib64 {
     base: Option<Reg>,
     scaled_index: Option<Reg>,
-    scale: Option<Scale>
+    scale: Option<Scale>,
 }
 
 impl Sib64 {
@@ -775,7 +768,7 @@ impl Sib64 {
                 0b1110 => (Some(Reg::R14), None),
                 0b1111 => (Some(Reg::R15), None),
                 _ => unreachable!(),
-            }
+            },
             0b01 => match idx {
                 0b0000 => (Some(Reg::RAX), Some(Scale(2))),
                 0b0001 => (Some(Reg::RCX), Some(Scale(2))),
@@ -794,7 +787,7 @@ impl Sib64 {
                 0b1110 => (Some(Reg::R14), Some(Scale(2))),
                 0b1111 => (Some(Reg::R15), Some(Scale(2))),
                 _ => unreachable!(),
-            }
+            },
             0b10 => match idx {
                 0b0000 => (Some(Reg::RAX), Some(Scale(4))),
                 0b0001 => (Some(Reg::RCX), Some(Scale(4))),
@@ -813,7 +806,7 @@ impl Sib64 {
                 0b1110 => (Some(Reg::R14), Some(Scale(4))),
                 0b1111 => (Some(Reg::R15), Some(Scale(4))),
                 _ => unreachable!(),
-            }
+            },
             0b11 => match idx {
                 0b0000 => (Some(Reg::RAX), Some(Scale(8))),
                 0b0001 => (Some(Reg::RCX), Some(Scale(8))),
@@ -832,7 +825,7 @@ impl Sib64 {
                 0b1110 => (Some(Reg::R14), Some(Scale(8))),
                 0b1111 => (Some(Reg::R15), Some(Scale(8))),
                 _ => unreachable!(),
-            }
+            },
             _ => unreachable!(),
         };
 

@@ -1,4 +1,4 @@
-use crate::{opcode::OpSize, modrm::Arch, inst::SizedOperand};
+use crate::{inst::SizedOperand, modrm::Arch, opcode::OpSize};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Reg {
@@ -101,11 +101,11 @@ impl SizedOperand for Reg {
             | Reg::DIL
             | Reg::R8b
             | Reg::R9b
-            | Reg::R10b 
-            | Reg::R11b 
+            | Reg::R10b
+            | Reg::R11b
             | Reg::R12b
-            | Reg::R13b 
-            | Reg::R14b 
+            | Reg::R13b
+            | Reg::R14b
             | Reg::R15b => OpSize::U8,
             Reg::AX
             | Reg::CX
@@ -117,11 +117,11 @@ impl SizedOperand for Reg {
             | Reg::DI
             | Reg::R8w
             | Reg::R9w
-            | Reg::R10w 
-            | Reg::R11w 
+            | Reg::R10w
+            | Reg::R11w
             | Reg::R12w
-            | Reg::R13w 
-            | Reg::R14w 
+            | Reg::R13w
+            | Reg::R14w
             | Reg::R15w => OpSize::U16,
             Reg::EAX
             | Reg::ECX
@@ -133,11 +133,11 @@ impl SizedOperand for Reg {
             | Reg::EDI
             | Reg::R8d
             | Reg::R9d
-            | Reg::R10d 
-            | Reg::R11d 
+            | Reg::R10d
+            | Reg::R11d
             | Reg::R12d
-            | Reg::R13d 
-            | Reg::R14d 
+            | Reg::R13d
+            | Reg::R14d
             | Reg::R15d => OpSize::U32,
             Reg::RAX
             | Reg::RCX
@@ -149,11 +149,11 @@ impl SizedOperand for Reg {
             | Reg::RDI
             | Reg::R8
             | Reg::R9
-            | Reg::R10 
-            | Reg::R11 
+            | Reg::R10
+            | Reg::R11
             | Reg::R12
-            | Reg::R13 
-            | Reg::R14 
+            | Reg::R13
+            | Reg::R14
             | Reg::R15 => OpSize::U64,
             _ => OpSize::CpuMode,
         }
@@ -271,7 +271,7 @@ pub trait Gpr {
             OpSize::U8 => Self::Reg8BitLo,
             OpSize::U16 => Self::Reg16Bit,
             OpSize::U32 => Self::Reg32Bit,
-            OpSize::U64 => Self::Reg64Bit, 
+            OpSize::U64 => Self::Reg64Bit,
             _ => Self::Reg32Bit,
         }
     }
@@ -280,7 +280,7 @@ pub trait Gpr {
         match arch {
             Arch::Arch16 => Self::Reg16Bit,
             Arch::Arch32 => Self::Reg32Bit,
-            Arch::Arch64 => Self::Reg64Bit, 
+            Arch::Arch64 => Self::Reg64Bit,
             _ => Self::Reg32Bit,
         }
     }
@@ -570,4 +570,3 @@ impl Reg {
         }
     }
 }
-

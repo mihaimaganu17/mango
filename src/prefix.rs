@@ -22,12 +22,12 @@ impl Prefix {
 
         // We first try and see, if we have a Group1 prefix
         if let Ok(temp_prefix) = Group1::try_from(value) {
-            return Some(Self::Group1(temp_prefix))
+            return Some(Self::Group1(temp_prefix));
         }
 
         // Second, if we have a Group2 prefix
         if let Ok(temp_prefix) = Group2::try_from(value) {
-            return Some(Self::Group2(temp_prefix))
+            return Some(Self::Group2(temp_prefix));
         }
 
         // Next, we check for overrides

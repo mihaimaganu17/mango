@@ -1,8 +1,8 @@
 //! Module that acts as the core disassembler of the program
-use crate::reader::{Reader, ReaderError};
-use crate::opcode::OpcodeError;
 use crate::inst::{Instruction, InstructionError};
 use crate::modrm::Arch;
+use crate::opcode::OpcodeError;
+use crate::reader::{Reader, ReaderError};
 
 #[derive(Debug)]
 pub struct Disassembler;
@@ -33,7 +33,11 @@ impl From<InstructionError> for DisassemblerError {
 }
 
 impl Disassembler {
-    pub fn parse(&self, reader: &mut Reader, maybe_arch: Option<Arch>) -> Result<(), DisassemblerError> {
+    pub fn parse(
+        &self,
+        reader: &mut Reader,
+        maybe_arch: Option<Arch>,
+    ) -> Result<(), DisassemblerError> {
         // Initialize a counter for how many instructions we have parsed
         let mut parser_insts = 0;
         while parser_insts < 20 && reader.bytes_unread() > 0 {

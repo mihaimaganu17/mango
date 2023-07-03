@@ -1,10 +1,10 @@
 //! Module that takes care of parsing the Opcode field in an instruction.
 use crate::{
-    prefix::{Prefix, Group1},
-    reader::{Reader, ReaderError},
-    rex::Rex,
-    reg::{Reg, RegFamily, SegmentRegister, Accumulator, Gpr},
     modrm::Arch,
+    prefix::{Group1, Prefix},
+    reader::{Reader, ReaderError},
+    reg::{Accumulator, Gpr, Reg, RegFamily, SegmentRegister},
+    rex::Rex,
 };
 
 /// Represents a primary opcode in an x86_64 Architecture. The primary opcode can be 1, 2 or even
@@ -218,7 +218,7 @@ impl Operand {
             OperandType::Z => match arch {
                 Arch::Arch16 => OpSize::U16,
                 Arch::Arch32 | Arch::Arch64 => OpSize::U32,
-            }
+            },
             OperandType::D => OpSize::U32,
         };
 
@@ -547,17 +547,32 @@ impl Opcode {
             }
             0x31 => Ok(Opcode {
                 ident: OpcodeType::Xor,
-                operands: [Some(Operand::ModRM(OpSize::CpuMode, AddrSize::from(arch))), Some(Operand::ModReg(OpSize::CpuMode)), None, None],
+                operands: [
+                    Some(Operand::ModRM(OpSize::CpuMode, AddrSize::from(arch))),
+                    Some(Operand::ModReg(OpSize::CpuMode)),
+                    None,
+                    None,
+                ],
                 encoding: Some(OperandEncoding::MR),
             }),
             0x34 => Ok(Opcode {
                 ident: OpcodeType::Xor,
-                operands: [Some(Operand::Reg(Accumulator::Reg8BitLo)), Some(Operand::Immediate(OpSize::U8)), None, None],
+                operands: [
+                    Some(Operand::Reg(Accumulator::Reg8BitLo)),
+                    Some(Operand::Immediate(OpSize::U8)),
+                    None,
+                    None,
+                ],
                 encoding: Some(OperandEncoding::I),
             }),
             0x35 => Ok(Opcode {
                 ident: OpcodeType::Xor,
-                operands: [Some(Operand::RegFamily(RegFamily::Accumulator)), Some(Operand::Immediate(OpSize::U32)), None, None],
+                operands: [
+                    Some(Operand::RegFamily(RegFamily::Accumulator)),
+                    Some(Operand::Immediate(OpSize::U32)),
+                    None,
+                    None,
+                ],
                 encoding: Some(OperandEncoding::I),
             }),
             // Push Opcode with general register
@@ -596,7 +611,12 @@ impl Opcode {
             // LEA
             0x8D => Ok(Opcode {
                 ident: OpcodeType::Lea,
-                operands: [Some(Operand::ModReg(OpSize::CpuMode)), Some(Operand::ModRM(OpSize::CpuMode, AddrSize::from(arch))), None, None],
+                operands: [
+                    Some(Operand::ModReg(OpSize::CpuMode)),
+                    Some(Operand::ModRM(OpSize::CpuMode, AddrSize::from(arch))),
+                    None,
+                    None,
+                ],
                 encoding: Some(OperandEncoding::RM),
             }),
             _ => Ok(Opcode {
@@ -607,39 +627,50 @@ impl Opcode {
         }
     }
 
-    pub fn convert_with_ext_arch(&mut self, ext: RegFieldExt, arch: Arch) -> Result<(), OpcodeError> {
+    pub fn convert_with_ext_arch(
+        &mut self,
+        ext: RegFieldExt,
+        arch: Arch,
+    ) -> Result<(), OpcodeError> {
         // We know the following extensions only have 2 operands
         match self.ident {
-            OpcodeType::NeedsModRMExtension(byte) => {
-                match byte {
-                    0x80 => {
-                        self.operands[0] = Some(Operand::from_map(AddressingMethod::E, OperandType::B, arch));
-                        self.operands[1] = Some(Operand::from_map(AddressingMethod::I, OperandType::B, arch));
-                        self.encoding = Some(OperandEncoding::MI);
-                    }
-                    0x81 => {
-                        self.operands[0] = Some(Operand::from_map(AddressingMethod::E, OperandType::V, arch));
-                        self.operands[1] = Some(Operand::from_map(AddressingMethod::I, OperandType::Z, arch));
-                        self.encoding = Some(OperandEncoding::MI);
-                    }
-                    0x82 => {
-                        self.operands[0] = Some(Operand::from_map(AddressingMethod::E, OperandType::B, arch));
-                        self.operands[1] = Some(Operand::from_map(AddressingMethod::I, OperandType::B, arch));
-                        self.encoding = Some(OperandEncoding::MI);
-                    }
-                    0x83 => {
-                        self.operands[0] = Some(Operand::from_map(AddressingMethod::E, OperandType::V, arch));
-                        self.operands[1] = Some(Operand::from_map(AddressingMethod::I, OperandType::B, arch));
-                        self.encoding = Some(OperandEncoding::MI);
-                    }
-                    0xFF => {
-                        self.operands[0] = Some(Operand::from_map(AddressingMethod::E, OperandType::V, arch));
-                        self.encoding = Some(OperandEncoding::MI);
-                    }
-                    _ => {},
+            OpcodeType::NeedsModRMExtension(byte) => match byte {
+                0x80 => {
+                    self.operands[0] =
+                        Some(Operand::from_map(AddressingMethod::E, OperandType::B, arch));
+                    self.operands[1] =
+                        Some(Operand::from_map(AddressingMethod::I, OperandType::B, arch));
+                    self.encoding = Some(OperandEncoding::MI);
                 }
-            }
-            _ => {},
+                0x81 => {
+                    self.operands[0] =
+                        Some(Operand::from_map(AddressingMethod::E, OperandType::V, arch));
+                    self.operands[1] =
+                        Some(Operand::from_map(AddressingMethod::I, OperandType::Z, arch));
+                    self.encoding = Some(OperandEncoding::MI);
+                }
+                0x82 => {
+                    self.operands[0] =
+                        Some(Operand::from_map(AddressingMethod::E, OperandType::B, arch));
+                    self.operands[1] =
+                        Some(Operand::from_map(AddressingMethod::I, OperandType::B, arch));
+                    self.encoding = Some(OperandEncoding::MI);
+                }
+                0x83 => {
+                    self.operands[0] =
+                        Some(Operand::from_map(AddressingMethod::E, OperandType::V, arch));
+                    self.operands[1] =
+                        Some(Operand::from_map(AddressingMethod::I, OperandType::B, arch));
+                    self.encoding = Some(OperandEncoding::MI);
+                }
+                0xFF => {
+                    self.operands[0] =
+                        Some(Operand::from_map(AddressingMethod::E, OperandType::V, arch));
+                    self.encoding = Some(OperandEncoding::MI);
+                }
+                _ => {}
+            },
+            _ => {}
         };
 
         if let OpcodeType::NeedsModRMExtension(byte) = self.ident {
@@ -680,7 +711,11 @@ impl Opcode {
     /// Special function that returns results based on the read prefix. This typically, and
     /// practically implies that the Opcode will be 2 or 3-bytes long.
     /// This function does not handle REX prefixes. It is the job of the caller to do that.
-    pub fn with_prefix_arch(reader: &mut Reader, prefixs: &[Prefix], arch: Arch) -> Result<Self, OpcodeError> {
+    pub fn with_prefix_arch(
+        reader: &mut Reader,
+        prefixs: &[Prefix],
+        arch: Arch,
+    ) -> Result<Self, OpcodeError> {
         // Read the first byte from the `reader`
         let first_byte = reader.read::<u8>()?;
 
@@ -746,10 +781,10 @@ impl Opcode {
                                                         encoding: Some(OperandEncoding::ZO),
                                                     }),
                                                     _ => Err(OpcodeError::Invalid3ByteOpcode(
-                                                            first_byte,
-                                                            second_byte,
-                                                            third_byte,
-                                                        )),
+                                                        first_byte,
+                                                        second_byte,
+                                                        third_byte,
+                                                    )),
                                                 }
                                             }
                                             _ => Ok(Opcode {
@@ -783,5 +818,4 @@ impl Opcode {
 
 mod opcode_prefix {
     pub const ESCAPE_CODE: u8 = 0x0F;
-
 }

@@ -1,21 +1,17 @@
-mod prefix;
-mod opcode;
-mod modrm;
-mod imm;
-mod reg;
-mod reader;
 mod dis;
-mod rex;
+mod imm;
 mod inst;
+mod modrm;
+mod opcode;
+mod prefix;
+mod reader;
+mod reg;
+mod rex;
 
 #[cfg(test)]
 mod tests {
+    use crate::{dis::Disassembler, modrm::Arch, reader::Reader};
     use std::fs;
-    use crate::{
-        reader::Reader,
-        dis::Disassembler,
-        modrm::Arch,
-    };
 
     #[test]
     fn read_ls_elf_poorly() {
@@ -26,10 +22,10 @@ mod tests {
         let exec_bytes = bytes.get(0x4000..0x13146).unwrap();
 
         let first_20_bytes = bytes.get(entry_point..entry_point + 20).unwrap();
-        let actual_first_20_bytes =
-            vec![0xf3, 0x0f, 0x1e, 0xfa, 0x31, 0xed, 0x49, 0x89, 0xd1, 0x5e, 0x48, 0x89, 0xe2,
-                    0x48, 0x83, 0xe4, 0xf0, 0x50, 0x54, 0x45];
-
+        let actual_first_20_bytes = vec![
+            0xf3, 0x0f, 0x1e, 0xfa, 0x31, 0xed, 0x49, 0x89, 0xd1, 0x5e, 0x48, 0x89, 0xe2, 0x48,
+            0x83, 0xe4, 0xf0, 0x50, 0x54, 0x45,
+        ];
 
         assert!(actual_first_20_bytes == first_20_bytes);
     }
