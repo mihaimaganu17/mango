@@ -367,6 +367,17 @@ impl Opcode {
                     encoding,
                 })
             }
+            // Pop Extra Selector
+            0x07 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::Segment(SegmentRegister::ES));
+                let encoding = Some(OperandEncoding::ZO);
+                Ok(Opcode {
+                    ident: OpcodeType::Pop,
+                    operands,
+                    encoding,
+                })
+            }
             // Push Code Selector
             0x0e => {
                 let mut operands = [None, None, None, None];
@@ -456,6 +467,17 @@ impl Opcode {
                     encoding,
                 })
             }
+            // Pop Stack Selector
+            0x17 => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::Segment(SegmentRegister::SS));
+                let encoding = Some(OperandEncoding::ZO);
+                Ok(Opcode {
+                    ident: OpcodeType::Pop,
+                    operands,
+                    encoding,
+                })
+            }
             // Push Data Selector
             0x1e => {
                 let mut operands = [None, None, None, None];
@@ -463,6 +485,17 @@ impl Opcode {
                 let encoding = Some(OperandEncoding::ZO);
                 Ok(Opcode {
                     ident: OpcodeType::Push,
+                    operands,
+                    encoding,
+                })
+            }
+            // Pop Data Selector
+            0x1f => {
+                let mut operands = [None, None, None, None];
+                operands[0] = Some(Operand::Segment(SegmentRegister::DS));
+                let encoding = Some(OperandEncoding::ZO);
+                Ok(Opcode {
+                    ident: OpcodeType::Pop,
                     operands,
                     encoding,
                 })
@@ -582,6 +615,12 @@ impl Opcode {
                 operands: [Some(Operand::RegInOpcode(byte)), None, None, None],
                 encoding: Some(OperandEncoding::O),
             }),
+            // Pop Opcode with general register
+            0x58 | 0x59 | 0x5A | 0x5B | 0x5C | 0x5D | 0x5E | 0x5F => Ok(Opcode {
+                ident: OpcodeType::Pop,
+                operands: [Some(Operand::RegInOpcode(byte)), None, None, None],
+                encoding: Some(OperandEncoding::O),
+            }),
             // Push Opcode for immediates
             0x68 => {
                 let mut operands = [None, None, None, None];
@@ -604,7 +643,7 @@ impl Opcode {
                 })
             }
             // Immediate Group 1, which needs extension from ModRM in order to get the opcode
-            0x80 | 0x81 | 0x82 | 0x83 | 0xFF => Ok(Opcode {
+            0x80 | 0x81 | 0x82 | 0x83 | 0x8F | 0xFF => Ok(Opcode {
                 ident: OpcodeType::NeedsModRMExtension(byte),
                 operands: [None, None, None, None],
                 encoding: None,
@@ -635,8 +674,6 @@ impl Opcode {
     ) -> Result<(), OpcodeError> {
         // We know the following extensions only have 2 operands
         match self.ident {
-            // Technically this type of opcode can decide the operand encoding only after reading
-            // the extension from the ModRM byte.
             OpcodeType::NeedsModRMExtension(byte) => match byte {
                 0x80 => {
                     self.operands[0] =
@@ -669,7 +706,7 @@ impl Opcode {
                 0x8F => {
                     self.operands[0] =
                         Some(Operand::from_map(AddressingMethod::E, OperandType::V, arch));
-                    self.encoding = Some(OperandEncoding::ZO);
+                    self.encoding = Some(OperandEncoding::M);
                 }
                 0xFF => {
                     self.operands[0] =
@@ -698,10 +735,10 @@ impl Opcode {
                     };
                 }
                 0x8F => {
-                    self.ident = match.ext.0 {
+                    self.ident = match ext.0 {
                         0 => OpcodeType::Pop,
                         _ => unreachable!(),
-                    }
+                    };
                 }
                 0xFF => {
                     self.ident = match ext.0 {
@@ -752,6 +789,17 @@ impl Opcode {
                                     encoding,
                                 })
                             }
+                            // Pop FS Selector
+                            0xA1 => {
+                                let mut operands = [None, None, None, None];
+                                operands[0] = Some(Operand::Segment(SegmentRegister::FS));
+                                let encoding = Some(OperandEncoding::ZO);
+                                Ok(Opcode {
+                                    ident: OpcodeType::Pop,
+                                    operands,
+                                    encoding,
+                                })
+                            }
                             // Push GS Selector
                             0xA8 => {
                                 let mut operands = [None, None, None, None];
@@ -759,6 +807,17 @@ impl Opcode {
                                 let encoding = Some(OperandEncoding::ZO);
                                 Ok(Opcode {
                                     ident: OpcodeType::Push,
+                                    operands,
+                                    encoding,
+                                })
+                            }
+                            // Pop GS Selector
+                            0xA9 => {
+                                let mut operands = [None, None, None, None];
+                                operands[0] = Some(Operand::Segment(SegmentRegister::GS));
+                                let encoding = Some(OperandEncoding::ZO);
+                                Ok(Opcode {
+                                    ident: OpcodeType::Pop,
                                     operands,
                                     encoding,
                                 })

@@ -130,6 +130,7 @@ impl Instruction {
         // Save the ident in a local variable
         let ident = third_opcode.ident;
 
+
         // We need to filter the opcode, yet again to check if we need an extension from the
         // ModRM byte, which is the next byte
         if let OpcodeType::NeedsModRMExtension(_) = ident {
@@ -164,8 +165,6 @@ impl Instruction {
                 // Parse the ModRM byte
                 let mut modrm = ModRM::from_byte_with_arch(modrm_byte, maybe_arch, maybe_rex);
 
-                println!("Modrm {:?}", modrm);
-
                 // Based on the addressing mode of the CPU, we have to/or not read the SIB byte
                 if let Some(arch) = maybe_arch {
                     match arch {
@@ -178,8 +177,10 @@ impl Instruction {
                                 // We know that we have a SIB, so we must take care now of how we
                                 // compute the effective address
                                 if modrm.1.mod_bits() == 0b00 {
-                                    sib.set_base(None);
-                                    modrm.1.set_displacement(Some(DispArch::Bit32));
+                                    if let Some(Reg::EBP) = sib.base() {
+                                        sib.set_base(None);
+                                        modrm.1.set_displacement(Some(DispArch::Bit32));
+                                    }
                                 }
 
                                 maybe_sib = Some(sib);
@@ -190,7 +191,6 @@ impl Instruction {
                                 let sib_byte = reader.read::<u8>()?;
                                 let mut sib =
                                     Sib::Sib64(Sib64::from_byte_with_rex(sib_byte, maybe_rex));
-                                println!("Sib {sib:#?}");
                                 // We know that we have a SIB, so we must take care now of how we
                                 // compute the effective address
                                 if modrm.1.mod_bits() == 0b00 {
@@ -290,7 +290,6 @@ impl Instruction {
                 }
                 // Handle the family
                 Some(Operand::RegInOpcode(opcode_byte)) => {
-                    println!("OpcodeByte {opcode_byte:x?}\n{maybe_rex:?}");
                     let lower_3bits = opcode_byte & 0b111;
                     let reg_64bit_encoding = if let Some(rex) = maybe_rex {
                         lower_3bits | (rex.b() << 3)
@@ -335,6 +334,7 @@ impl Instruction {
                         resolved_operands[idx] = Some(ResolvedOperand::Reg(reg));
                     } else {
                         let mem = modrm.rm_mem();
+                        println!("Mem: {:#?}", mem);
                         let mem = match overridable_addr_size.contains(addr_size) {
                             true => {
                                 let eff_addr = mem.convert_with_addrsize(addr_size_override);
