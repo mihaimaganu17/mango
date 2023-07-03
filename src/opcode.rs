@@ -43,6 +43,7 @@ pub enum OpcodeType {
     JmpNear,
     JmpFar,
     Push,
+    Pop,
     // A bitwise XOR between 2 operands
     Xor,
     // The opcode alone is not enough and it needs an Extension from a ModRM field
@@ -634,6 +635,8 @@ impl Opcode {
     ) -> Result<(), OpcodeError> {
         // We know the following extensions only have 2 operands
         match self.ident {
+            // Technically this type of opcode can decide the operand encoding only after reading
+            // the extension from the ModRM byte.
             OpcodeType::NeedsModRMExtension(byte) => match byte {
                 0x80 => {
                     self.operands[0] =
@@ -663,6 +666,11 @@ impl Opcode {
                         Some(Operand::from_map(AddressingMethod::I, OperandType::B, arch));
                     self.encoding = Some(OperandEncoding::MI);
                 }
+                0x8F => {
+                    self.operands[0] =
+                        Some(Operand::from_map(AddressingMethod::E, OperandType::V, arch));
+                    self.encoding = Some(OperandEncoding::ZO);
+                }
                 0xFF => {
                     self.operands[0] =
                         Some(Operand::from_map(AddressingMethod::E, OperandType::V, arch));
@@ -688,6 +696,12 @@ impl Opcode {
                         7 => OpcodeType::Cmp,
                         _ => unreachable!(),
                     };
+                }
+                0x8F => {
+                    self.ident = match.ext.0 {
+                        0 => OpcodeType::Pop,
+                        _ => unreachable!(),
+                    }
                 }
                 0xFF => {
                     self.ident = match ext.0 {
@@ -802,8 +816,8 @@ impl Opcode {
                                 operands: [None, None, None, None],
                                 encoding: None,
                             }),
-                            // If we have an escape code, any other prefix is invalid for a 2-byte, 3-byte
-                            // opcode
+                            // If we have an escape code, any other prefix is invalid for a 2-byte,
+                            // 3-byte opcode
                             _ => Err(OpcodeError::InvalidPrefix(prefix)),
                         }
                     }
