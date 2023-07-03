@@ -2,6 +2,18 @@ section .text
 global _start
 
 _start:
+    ; pop instruction
+    pop rax
+    pop word [rax]
+    pop qword [rax]
+    pop word [rcx*2]
+    pop qword [rcx*2]
+    pop word [ecx*4+0xcafe]
+    pop qword [ecx*4+0xcafe]
+
+    pop fs
+    pop gs
+    
     ; push instructions
     ; push selectors
     push fs
