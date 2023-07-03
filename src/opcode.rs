@@ -44,6 +44,10 @@ pub enum OpcodeType {
     JmpFar,
     Push,
     Pop,
+    // ASCII adjust after addition
+    Aaa,
+    // Decimal Adjust AL after Addition
+    Daa,
     // A bitwise XOR between 2 operands
     Xor,
     // The opcode alone is not enough and it needs an Extension from a ModRM field
@@ -563,6 +567,24 @@ impl Opcode {
                 let encoding = Some(OperandEncoding::I);
                 Ok(Opcode {
                     ident: OpcodeType::And,
+                    operands,
+                    encoding,
+                })
+            }
+            0x27 => {
+                let mut operands = [None, None, None, None];
+                let encoding = Some(OperandEncoding::ZO);
+                Ok(Opcode {
+                    ident: OpcodeType::Daa,
+                    operands,
+                    encoding,
+                })
+            }
+            0x37 => {
+                let mut operands = [None, None, None, None];
+                let encoding = Some(OperandEncoding::ZO);
+                Ok(Opcode {
+                    ident: OpcodeType::Aaa,
                     operands,
                     encoding,
                 })
