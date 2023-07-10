@@ -3,6 +3,7 @@ use crate::inst::{Instruction, InstructionError};
 use crate::modrm::Arch;
 use crate::opcode::OpcodeError;
 use crate::reader::{Reader, ReaderError};
+use crate::print_opcode_type;
 
 #[derive(Debug)]
 pub struct Disassembler;
@@ -46,11 +47,17 @@ impl Disassembler {
             } else {
                 Some(Arch::Arch64)
             };
+            reader.start_recording()?;
             let instruction = Instruction::from_reader(reader, arch)?;
             parser_insts += 1;
+            let read_bytes = reader.stop_recording()?;
 
-            println!("{:#x?}", instruction.opcode);
-            println!("{:#x?}", instruction.operands);
+            let hex_bytes = read_bytes.iter().fold(String::new(), |acc, x| format!("{acc}{x:02x} "));
+
+            let ident = instruction.opcode.ident;
+
+            println!("{0: <30} {1: <20}", hex_bytes, print_opcode_type!(ident));
+            //println!("{:#x?}", instruction.operands);
         }
 
         // First we try and read the prefix

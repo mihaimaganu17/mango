@@ -60,6 +60,13 @@ pub enum OpcodeType {
     Unknown,
 }
 
+#[macro_export]
+macro_rules! print_opcode_type {
+    ($opcode_type:expr) => {
+        format!("{:?}", $opcode_type).to_lowercase()
+    }
+}
+
 #[derive(Debug)]
 pub struct Opcode {
     pub ident: OpcodeType,
