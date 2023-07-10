@@ -10,6 +10,7 @@ use crate::{
     reg::{Reg, RegFamily, SegmentRegister},
     rex::Rex,
 };
+use core::fmt;
 
 #[derive(Debug)]
 pub struct Instruction {
@@ -49,6 +50,12 @@ pub enum ResolvedOperand {
     Segment(SegmentRegister),
     Mem((EffAddrType, Option<Sib>, Option<Displacement>)),
     ToBeDecided,
+}
+
+impl fmt::Display for ResolvedOperand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Ok(())
+    }
 }
 
 pub trait SizedOperand {
@@ -334,7 +341,6 @@ impl Instruction {
                         resolved_operands[idx] = Some(ResolvedOperand::Reg(reg));
                     } else {
                         let mem = modrm.rm_mem();
-                        println!("Mem: {:#?}", mem);
                         let mem = match overridable_addr_size.contains(addr_size) {
                             true => {
                                 let eff_addr = mem.convert_with_addrsize(addr_size_override);

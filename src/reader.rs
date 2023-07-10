@@ -6,6 +6,8 @@ pub struct Reader {
     pos: usize,
     // Buffer used to read data from
     bytes: Vec<u8>,
+    // It symbolises the cursor point where we started recording the bytes we read
+    record_pos: Option<usize>,
 }
 
 /// General error raised when one of the `Reader` methods fails
@@ -13,6 +15,8 @@ pub struct Reader {
 pub enum ReaderError {
     NotEnoughBytes,
     TryFromSliceError(TryFromSliceError),
+    AlreadyRecording,
+    RecordingNotStarted,
 }
 
 impl From<TryFromSliceError> for ReaderError {
@@ -24,7 +28,7 @@ impl From<TryFromSliceError> for ReaderError {
 impl Reader {
     /// Create a new `Reader` from a vector of bytes
     pub fn from_vec(bytes: Vec<u8>) -> Self {
-        Self { pos: 0, bytes }
+        Self { pos: 0, bytes, record_pos: None }
     }
 
     pub fn bytes_unread(&self) -> usize {
@@ -49,6 +53,37 @@ impl Reader {
 
         // Return the read bytes
         Ok(bytes_read)
+    }
+
+    /// Sets a checkpoint to the current cursor where the reader will know to start recording all
+    /// the bytes that we read
+    pub fn start_recording(&mut self) -> Result<(), ReaderError> {
+        if let None = self.record_pos {
+            self.record_pos = Some(self.pos);
+            Ok(())
+        } else {
+            Err(ReaderError::AlreadyRecording)
+        }
+    }
+
+    /// Stops the recording at the current cursor's position, returning all the read bytes from the
+    /// start of the recording until now
+    pub fn stop_recording(&mut self) -> Result<&[u8], ReaderError> {
+        if let Some(pos) = self.record_pos {
+            // Try and read the recorded bytes
+            // This should be safe and `pos` should be <= `self.pos` since we cannot got backwards
+            // with the cursor
+            let bytes_read = self
+                .bytes
+                .get(pos..self.pos)
+                .ok_or(ReaderError::NotEnoughBytes)?;
+
+            self.record_pos = None;
+
+            Ok(bytes_read)
+        } else { 
+            Err(ReaderError::RecordingNotStarted)
+        }
     }
 
     /// Reads `size` bytes from the buffer that back this `Reader`, without moving the buffer
