@@ -40,7 +40,27 @@ pub struct Instruction {
     imm: Option<Immediate>,
     // After gathering all the required information about parsing the instruction, we need to
     // resolve to the actual operands of the instruction
-    pub operands: [Option<ResolvedOperand>; 4],
+    pub operands: InstOperands,
+}
+
+#[derive(Debug)]
+pub struct InstOperands([Option<ResolvedOperand>; 4]);
+
+impl fmt::Display for InstOperands {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut formatted_operands = String::new();
+        for (idx, maybe_operand) in self.0.iter().enumerate() {
+            if let Some(operand) = maybe_operand {
+                if idx == 0 {
+                    formatted_operands = format!("{operand}");
+                } else {
+                    formatted_operands = format!("{formatted_operands}, {operand}");
+                }
+            }
+        }
+
+        write!(f, "{}", formatted_operands)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -54,7 +74,27 @@ pub enum ResolvedOperand {
 
 impl fmt::Display for ResolvedOperand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Ok(())
+        match self {
+            ResolvedOperand::Immediate(imm) => write!(f, "{}", imm),
+            ResolvedOperand::Reg(reg) => write!(f, "{}", reg), 
+            ResolvedOperand::Segment(seg_reg) => write!(f, "{}", seg_reg),
+            ResolvedOperand::Mem((eff_addr, maybe_sib, maybe_disp)) => {
+                write!(f, "[");
+                match eff_addr {
+                    EffAddrType::Reg(reg) => write!(f, "{}", reg),
+                    _ => {
+                        if let Some(sib) = maybe_sib {
+                            write!(f, "{}", sib);
+                        }
+                        if let Some(disp) = maybe_disp {
+                            write!(f, "{}", disp);
+                        }
+                    }
+                }
+                write!(f, "]")
+            }
+            ResolvedOperand::ToBeDecided => write!(f, "UNKNOWN"),
+        }
     }
 }
 
@@ -388,7 +428,7 @@ impl Instruction {
             sib: maybe_sib,
             disp: maybe_disp,
             imm: maybe_imm,
-            operands: resolved_operands,
+            operands: InstOperands(resolved_operands),
         })
     }
 }

@@ -4,6 +4,7 @@ use crate::{
     opcode::OpSize,
     reader::{Reader, ReaderError},
 };
+use core::fmt;
 
 /// The "displacement" is just a constant that gets added to the rest of the address. Examples
 /// include:
@@ -66,6 +67,21 @@ pub enum Immediate {
     ImmI16(i16),
     ImmI32(i32),
     ImmI64(i64),
+}
+
+impl fmt::Display for Immediate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Immediate::ImmU8(value) => write!(f, "0x{:x}", value),
+            Immediate::ImmU16(value) => write!(f, "0x{:x}", value),
+            Immediate::ImmU32(value) => write!(f, "0x{:x}", value),
+            Immediate::ImmU64(value) => write!(f, "0x{:x}", value),
+            Immediate::ImmI8(value) => write!(f, "0x{:x}", value),
+            Immediate::ImmI16(value) => write!(f, "0x{:x}", value),
+            Immediate::ImmI32(value) => write!(f, "0x{:x}", value),
+            Immediate::ImmI64(value) => write!(f, "0x{:x}", value),
+        }
+    }
 }
 
 impl SizedOperand for Immediate {

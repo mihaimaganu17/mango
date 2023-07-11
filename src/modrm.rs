@@ -5,6 +5,7 @@ use crate::inst::SizedOperand;
 use crate::opcode::{AddrSize, OpSize};
 use crate::reg::Reg;
 use crate::rex::Rex;
+use core::fmt;
 
 /// Made up of three parts:
 /// - R/M, bits[0:3]
@@ -555,6 +556,15 @@ impl EffAddr64Bit {
 pub enum Sib {
     Sib32(Sib32),
     Sib64(Sib64),
+}
+
+impl fmt::Display for Sib {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Sib::Sib32(sib32) => write!(f, "{}", sib32),
+            Sib::Sib64(sib64) => write!(f, "{}", sib64),
+        }
+    }
 }
 
 impl SizedOperand for Sib {

@@ -1,4 +1,5 @@
 use crate::{inst::SizedOperand, modrm::Arch, opcode::OpSize};
+use core::fmt;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Reg {
@@ -88,6 +89,12 @@ pub enum Reg {
     BPL,
 }
 
+impl fmt::Display for Reg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", format!("{self:?}").to_lowercase())
+    }
+}
+
 impl SizedOperand for Reg {
     fn size(&self) -> OpSize {
         match self {
@@ -168,6 +175,12 @@ pub enum SegmentRegister {
     ES,
     FS,
     GS,
+}
+
+impl fmt::Display for SegmentRegister {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", format!("{self:?}").to_lowercase())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

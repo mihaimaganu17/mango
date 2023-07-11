@@ -61,7 +61,7 @@ mod tests {
         dis.parse(&mut reader, Some(Arch::Arch64)).unwrap();
     }
 
-    //#[test]
+    #[test]
     fn test_dis_parse_hello_x64() {
         let ls_path = "hello_world_lea_xor";
         let bytes = fs::read(ls_path).unwrap();
@@ -74,7 +74,7 @@ mod tests {
         dis.parse(&mut reader, Some(Arch::Arch64)).unwrap();
     }
 
-    #[test]
+    //#[test]
     fn test_dis_parse_hello_x86() {
         let ls_path = "hello_world_x86";
         let bytes = fs::read(ls_path).unwrap();

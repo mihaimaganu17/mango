@@ -61,7 +61,7 @@ pub enum OpcodeType {
 }
 
 #[macro_export]
-macro_rules! print_opcode_type {
+macro_rules! stringify_opcode_type {
     ($opcode_type:expr) => {
         format!("{:?}", $opcode_type).to_lowercase()
     }

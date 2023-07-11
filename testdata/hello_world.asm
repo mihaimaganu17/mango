@@ -4,6 +4,7 @@ global _start
 _start:
     ; pop instruction
     pop rax
+    push qword [0xcafebab]
     pop word [rax]
     pop qword [rax]
     pop word [rcx*2]
