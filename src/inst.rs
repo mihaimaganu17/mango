@@ -44,13 +44,27 @@ pub struct Instruction {
 }
 
 #[derive(Debug)]
-pub struct InstOperands([Option<ResolvedOperand>; 4]);
+pub struct InstOperands {
+    op_size: OpSize,
+    operands: [Option<ResolvedOperand>; 4],
+}
 
 impl fmt::Display for InstOperands {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut formatted_operands = String::new();
-        for (idx, maybe_operand) in self.0.iter().enumerate() {
+        for (idx, maybe_operand) in self.operands.iter().enumerate() {
             if let Some(operand) = maybe_operand {
+                // If our operand is a memory operand, we have to specify its size
+                if let ResolvedOperand::Mem((eff_addr, _, _)) = operand {
+                    match self.op_size {
+                        OpSize::U8 | OpSize::I8 => write!(f, "BYTE ")?,
+                        OpSize::U16 | OpSize::I16 => write!(f, "WORD ")?,
+                        OpSize::U32 | OpSize::I32 => write!(f, "DWORD ")?,
+                        OpSize::U64 | OpSize::I64 => write!(f, "QWORD ")?,
+                        OpSize::CpuMode => write!(f, "CpuMode ")?,
+                    };
+                    write!(f, "PTR ");
+                }
                 if idx == 0 {
                     formatted_operands = format!("{operand}");
                 } else {
@@ -82,15 +96,19 @@ impl fmt::Display for ResolvedOperand {
                 write!(f, "[");
                 match eff_addr {
                     EffAddrType::Reg(reg) => write!(f, "{}", reg),
-                    _ => {
+                    EffAddrType::Sib | EffAddrType::None => {
                         if let Some(sib) = maybe_sib {
-                            write!(f, "{}", sib);
+                            write!(f, "{}", sib)?;
+                            if maybe_disp.is_some() && !sib.is_empty() {
+                                write!(f, "+")?;
+                            }
                         }
                         if let Some(disp) = maybe_disp {
-                            write!(f, "{}", disp);
+                            write!(f, "{}", disp)?;
                         }
+                        Ok(())
                     }
-                }
+                };
                 write!(f, "]")
             }
             ResolvedOperand::ToBeDecided => write!(f, "UNKNOWN"),
@@ -273,19 +291,20 @@ impl Instruction {
         // Search if there are any immediates in the operands
         let mut resolved_operands: [Option<ResolvedOperand>; 4] = [None; 4];
 
+        // We need to take into consideration the Operand Size override prefix, when resolving
+        // the operands. This switches the size of the operand depending on the CPU mode and
+        // also the REX prefix
+        let mut op_size_override = OpSize::from_cpu_opcode(cpu_mode, third_opcode.ident);
+
+        // We also need to take into consideration the AddressSize override prefix, when
+        // resolving operands which refer to memory.
+        let mut addr_size_override = AddrSize::from(cpu_mode);
+
         for (idx, op) in third_opcode.operands.iter().enumerate() {
             // We just ignore operands which are `None`
             if op.is_none() {
                 continue;
             }
-            // We need to take into consideration the Operand Size override prefix, when resolving
-            // the operands. This switches the size of the operand depending on the CPU mode and
-            // also the REX prefix
-            let mut op_size_override = OpSize::from(cpu_mode);
-
-            // We also need to take into consideration the AddressSize override prefix, when
-            // resolving operands which refer to memory.
-            let mut addr_size_override = AddrSize::from(cpu_mode);
 
             if prefixs.contains(&Prefix::OpSize) {
                 op_size_override = match cpu_mode {
@@ -428,7 +447,7 @@ impl Instruction {
             sib: maybe_sib,
             disp: maybe_disp,
             imm: maybe_imm,
-            operands: InstOperands(resolved_operands),
+            operands: InstOperands { operands: resolved_operands, op_size: op_size_override},
         })
     }
 }

@@ -181,7 +181,32 @@ impl From<Arch> for OpSize {
         match value {
             Arch::Arch16 => Self::U16,
             // In both 32-bit and 64-bit mode, the default operand size, is 32-bit,
-            Arch::Arch32 | Arch::Arch64 => Self::U32,
+            Arch::Arch32 => Self::U32,
+            Arch::Arch64 => Self::U64,
+        }
+    }
+}
+
+impl OpSize {
+    pub fn from_cpu_opcode(value: Arch, opcode_ident: OpcodeType) -> Self {
+        // We have certain instructions which have the default operation size different from the
+        // majority
+        match opcode_ident {
+            OpcodeType::Add
+            | OpcodeType::Adc
+            | OpcodeType::And
+            | OpcodeType::Xor
+            | OpcodeType::Or
+            | OpcodeType::Sbb
+            | OpcodeType::Sub
+            | OpcodeType::Cmp => {
+                match value {
+                    Arch::Arch16 => Self::U16,
+                    // In both 32-bit and 64-bit mode, the default operand size, is 32-bit,
+                    Arch::Arch32 | Arch::Arch64 => Self::U32,
+                }
+            }
+            _ => OpSize::from(value)
         }
     }
 }

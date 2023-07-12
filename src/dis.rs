@@ -41,7 +41,7 @@ impl Disassembler {
     ) -> Result<(), DisassemblerError> {
         // Initialize a counter for how many instructions we have parsed
         let mut parser_insts = 0;
-        while parser_insts < 20 && reader.bytes_unread() > 0 {
+        while parser_insts < 100 && reader.bytes_unread() > 0 {
             let arch = if let Some(_) = maybe_arch {
                 maybe_arch
             } else {

@@ -21,6 +21,17 @@ pub enum Displacement {
     Disp64(u64),
 }
 
+impl fmt::Display for Displacement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Displacement::Disp8(value) => write!(f, "0x{:x}", value),
+            Displacement::Disp16(value) => write!(f, "0x{:x}", value),
+            Displacement::Disp32(value) => write!(f, "0x{:x}", value),
+            Displacement::Disp64(value) => write!(f, "0x{:x}", value),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DispArch {
     // Denotes an 8-bit displacement that follows the ModR/M byte and that is sign-extended and

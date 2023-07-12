@@ -628,19 +628,50 @@ impl Sib {
             Self::Sib64(sib64) => sib64.base = base,
         };
     }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Self::Sib32(sib32) => sib32.base.is_none() && sib32.scaled_index.is_none() && sib32.scale.is_none(),
+            Self::Sib64(sib64) => sib64.base.is_none() && sib64.scaled_index.is_none() && sib64.scale.is_none(),
+        }
+    }
 }
 
 // This represents the top 2 bits(Scale parameter) of the SIB byte in an x86_64 instruction
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Scale(u8);
 
+impl fmt::Display for Scale {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 /// Represents a 32-bit Sib byte components
-// TODO: We should make this version and the 64-bit version into generics
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Sib32 {
     base: Option<Reg>,
     scaled_index: Option<Reg>,
     scale: Option<Scale>,
+}
+
+impl fmt::Display for Sib32 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(base_reg) = self.base {
+            write!(f, "{}", base_reg)?;
+            // If we also have a scale, we need to add a plus
+            if let Some(_) = self.scaled_index {
+                write!(f, "+")?;
+            }
+        }
+        if let Some(scale_index_reg) = self.scaled_index {
+            write!(f, "{}", scale_index_reg)?;
+            if let Some(scale) = self.scale {
+                write!(f, "*{}", scale)?;
+            }
+        }
+        Ok(())
+    }
 }
 
 impl From<u8> for Sib32 {
@@ -725,6 +756,25 @@ pub struct Sib64 {
     scale: Option<Scale>,
 }
 
+impl fmt::Display for Sib64 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(base_reg) = self.base {
+            write!(f, "{}", base_reg)?;
+            // If we also have a scale, we need to add a plus
+            if let Some(_) = self.scaled_index {
+                write!(f, "+")?;
+            }
+        }
+        if let Some(scale_index_reg) = self.scaled_index {
+            write!(f, "{}", scale_index_reg)?;
+            if let Some(scale) = self.scale {
+                write!(f, "*{}", scale)?;
+            }
+        }
+        Ok(())
+    }
+}
+
 impl Sib64 {
     pub fn from_byte_with_rex(value: u8, maybe_rex: Option<Rex>) -> Self {
         let scale = (value >> 6) & 0b11;
@@ -736,8 +786,6 @@ impl Sib64 {
             idx = (rex.x() << 3) | idx;
             base = (rex.b() << 3) | base;
         }
-
-        println!("Base: {base:b}");
 
         let base = match base {
             0b0000 => Some(Reg::RAX),
